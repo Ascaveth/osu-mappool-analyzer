@@ -1,0 +1,790 @@
+openapi: "3.1.0"
+info:
+  title: osu! Mappool Analyzer API
+  version: "1.0.0"
+  description: >
+    Exposes the Tournament aggregate (configuration), the Beatmap aggregate
+    (import), and the Analysis Engine's output (Analyses and Reports).
+    Analyses and Reports are computed on demand from the current Tournament
+    state — they are derived data, never stored independently of the
+    Analyses they were built from (docs/04-architecture-principles.md
+    Principle 5; docs/13-report-specification.md).
+  license:
+    name: UNLICENSED
+    url: https://github.com/Ascaveth/osu-mappool-analyzer
+servers:
+  - url: https://api.mappool-analyzer.example/v1
+    description: Production (placeholder — no deployment exists yet)
+
+tags:
+  - name: Tournaments
+    description: The configuration aggregate (Tournament → Stage → Category → Slot).
+  - name: Stages
+    description: Read-only access to one Stage within a Tournament, addressable by ID alone.
+  - name: Categories
+    description: Read-only access to one Category within a Stage, addressable by ID alone.
+  - name: Slots
+    description: Assigning and clearing the Beatmap a Slot points to.
+  - name: Beatmaps
+    description: The standalone Beatmap aggregate — import and lookup.
+  - name: Analyses
+    description: On-demand output of the Analysis Engine for a Tournament's current state.
+  - name: Reports
+    description: Narrative summaries built from Analyses (docs/13-report-specification.md).
+
+paths:
+  /tournaments:
+    get:
+      operationId: listTournaments
+      tags: [Tournaments]
+      summary: List tournaments
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: q
+          in: query
+          description: Case-insensitive substring match against tournament name.
+          schema: { type: string }
+        - name: sort
+          in: query
+          description: Sort key. Prefix with `-` for descending.
+          schema: { type: string, enum: [name, -name], default: name }
+      responses:
+        "200":
+          description: Paginated list of tournaments (summary form — no stages/categories/slots).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/TournamentSummary" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      operationId: createTournament
+      tags: [Tournaments]
+      summary: Create a tournament from a configuration
+      description: >
+        Creates the Tournament aggregate (Tournament → Stage → Category →
+        Slot) in one transactionally-consistent write, per
+        docs/06-domain-model.md's aggregate boundary. Slots are generated
+        from each category's `slotCount`, unfilled (`beatmap_id` null).
+        Matches the configuration shape in
+        docs/07-tournament-configuration.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TournamentConfiguration" }
+            examples:
+              qualifiers_only:
+                summary: A single-stage tournament with five mod categories
+                value:
+                  name: "Example Open"
+                  edition: "2026"
+                  stages:
+                    - name: "Qualifiers"
+                      order: 1
+                      categories:
+                        - { name: "NM", order: 1, slotCount: 5 }
+                        - { name: "HD", order: 2, slotCount: 2 }
+                        - { name: "HR", order: 3, slotCount: 2 }
+                        - { name: "DT", order: 4, slotCount: 2 }
+                        - { name: "FM", order: 5, slotCount: 2 }
+      responses:
+        "201":
+          description: Tournament created.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tournament" }
+              examples:
+                created:
+                  value:
+                    id: "8f14e1f0-9b1a-4e6a-9c0a-1f2e3d4c5b6a"
+                    name: "Example Open"
+                    edition: "2026"
+                    stages:
+                      - id: "1b2c3d4e-5f60-4718-9a0b-1c2d3e4f5061"
+                        name: "Qualifiers"
+                        order: 1
+                        categories:
+                          - id: "2c3d4e5f-6071-4829-ab1c-2d3e4f506172"
+                            name: "NM"
+                            order: 1
+                            slots:
+                              - { id: "3d4e5f60-7182-4930-bc2d-3e4f50617283", position: 1, beatmap_id: null }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /tournaments/{tournamentId}:
+    parameters:
+      - $ref: "#/components/parameters/TournamentId"
+    get:
+      operationId: getTournament
+      tags: [Tournaments]
+      summary: Get a tournament's full structure
+      description: >
+        Returns the full Tournament → Stage → Category → Slot tree.
+        Slots reference Beatmaps by `beatmap_id` only, never embedded —
+        Beatmap is a separate aggregate (docs/06-domain-model.md). Fetch
+        `/beatmaps/{beatmapId}` for beatmap detail.
+      responses:
+        "200":
+          description: Tournament found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tournament" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    patch:
+      operationId: updateTournament
+      tags: [Tournaments]
+      summary: Rename a tournament or change its edition
+      description: >
+        Limited to `name` and `edition`. Structural changes (stages,
+        categories, slot counts) are not supported via PATCH in v1 — the
+        Tournament aggregate is edited together as one unit
+        (docs/06-domain-model.md), and a partial structural PATCH would
+        require conflict rules (e.g. what happens to a stage's filled
+        slots when its category's slotCount shrinks) that are out of
+        scope until a real need for re-configuration after import
+        emerges. To restructure, create a new tournament.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1 }
+                edition: { type: string }
+              minProperties: 1
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tournament" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    delete:
+      operationId: deleteTournament
+      tags: [Tournaments]
+      summary: Delete a tournament
+      responses:
+        "204": { description: Deleted. }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /stages/{stageId}:
+    parameters:
+      - $ref: "#/components/parameters/StageId"
+    get:
+      operationId: getStage
+      tags: [Stages]
+      summary: Get a stage
+      description: >
+        Flat (not nested under /tournaments/{id}) because Analysis and
+        Report citations reference a Stage by ID alone
+        (domain.Scope{Type: stage, ID}) — a client following a citation
+        shouldn't need the parent tournament ID to resolve it.
+      responses:
+        "200":
+          description: Stage found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /categories/{categoryId}:
+    parameters:
+      - $ref: "#/components/parameters/CategoryId"
+    get:
+      operationId: getCategory
+      tags: [Categories]
+      summary: Get a category
+      responses:
+        "200":
+          description: Category found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /slots/{slotId}/beatmap:
+    parameters:
+      - $ref: "#/components/parameters/SlotId"
+    put:
+      operationId: assignSlotBeatmap
+      tags: [Slots]
+      summary: Assign a beatmap to a slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [beatmap_id]
+              properties:
+                beatmap_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Slot updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Slot" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    delete:
+      operationId: unassignSlotBeatmap
+      tags: [Slots]
+      summary: Clear a slot's beatmap
+      description: >
+        Returns the slot to its unfilled state. Per
+        docs/06-domain-model.md, an unfilled slot is valid pool state, not
+        an error condition — analyzers are required to handle it.
+      responses:
+        "204": { description: Cleared. }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /beatmaps:
+    get:
+      operationId: listBeatmaps
+      tags: [Beatmaps]
+      summary: List imported beatmaps
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: q
+          in: query
+          description: Case-insensitive substring match against title or artist.
+          schema: { type: string }
+        - name: mapper
+          in: query
+          schema: { type: string }
+        - name: bpm_min
+          in: query
+          schema: { type: number }
+        - name: bpm_max
+          in: query
+          schema: { type: number }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [title, -title, bpm, -bpm, length_seconds, -length_seconds], default: title }
+      responses:
+        "200":
+          description: Paginated list of beatmaps.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Beatmap" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      operationId: importBeatmap
+      tags: [Beatmaps]
+      summary: Import a .osu file
+      description: >
+        Runs the import pipeline (osufile.Parse → normalize.Beatmap →
+        BeatmapRepository.Save, docs/08-beatmap-import-pipeline.md).
+        Re-importing a file whose content hash already exists returns the
+        existing Beatmap with 200, not a duplicate
+        (docs/06-domain-model.md domain rule) — only a genuinely new file
+        returns 201.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: Raw .osu file bytes. }
+      responses:
+        "200":
+          description: File content matched an existing Beatmap (deduplicated, not re-created).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Beatmap" }
+        "201":
+          description: New beatmap imported.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Beatmap" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "422":
+          description: File parsed as a valid upload but is not a parseable .osu file.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /beatmaps/{beatmapId}:
+    parameters:
+      - $ref: "#/components/parameters/BeatmapId"
+    get:
+      operationId: getBeatmap
+      tags: [Beatmaps]
+      summary: Get a beatmap
+      responses:
+        "200":
+          description: Beatmap found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Beatmap" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /tournaments/{tournamentId}/analyses:
+    parameters:
+      - $ref: "#/components/parameters/TournamentId"
+    get:
+      operationId: listTournamentAnalyses
+      tags: [Analyses]
+      summary: Run the Analysis Engine and return results
+      description: >
+        Computed on demand by running every registered Analyzer against
+        the tournament's current state (internal/analysis.Engine.Run) —
+        Analyses are not persisted independently of the Tournament state
+        that produced them (docs/04-architecture-principles.md Principle
+        5), so this is a GET: safe and idempotent for a given Tournament
+        state, and re-running it after the Tournament changes is the
+        intended way to get fresh results. `SourceHash` on each Analysis
+        lets a client detect whether a result actually changed since a
+        previous call.
+
+        There is deliberately no `/validations` endpoint — Validation is
+        not a separate entity, it's a Finding whose severity is `warning`
+        or `critical` (docs/06-domain-model.md, docs/12-tournament-analyzers.md
+        "Why there is no ValidationAnalyzer"). Use `severity` below to get
+        the same thing.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: analyzer_name
+          in: query
+          schema: { type: string }
+        - name: scope_type
+          in: query
+          schema: { $ref: "#/components/schemas/ScopeType" }
+        - name: scope_id
+          in: query
+          schema: { type: string }
+        - name: severity
+          in: query
+          description: Comma-separated severities to include (filters Findings, not whole Analyses).
+          schema: { type: string, example: "warning,critical" }
+      responses:
+        "200":
+          description: Paginated list of Analyses.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Analysis" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /tournaments/{tournamentId}/report:
+    parameters:
+      - $ref: "#/components/parameters/TournamentId"
+    get:
+      operationId: getTournamentReport
+      tags: [Reports]
+      summary: Build a narrative Report from the tournament's Analyses
+      description: >
+        Runs the Analysis Engine, then narrates the results via
+        report.Build (docs/13-report-specification.md). Computed on
+        demand, like /analyses — a Report is a derived view, never a
+        source of new conclusions. Defaults to the whole tournament;
+        narrow with `scope_type`/`scope_id` to report on one Stage or
+        Category (the Analyses considered are filtered to that scope
+        before narration).
+      parameters:
+        - name: scope_type
+          in: query
+          schema: { $ref: "#/components/schemas/ScopeType" }
+        - name: scope_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+              examples:
+                stage_with_one_warning:
+                  value:
+                    scope: { type: "tournament", id: "8f14e1f0-9b1a-4e6a-9c0a-1f2e3d4c5b6a" }
+                    generated_at: "2026-06-30T12:00:00Z"
+                    sections:
+                      summary: "This report covers 1 finding(s) across 4 analysis result(s). 1 warning(s) were also raised: one category holds 75% of this stage's total slots."
+                      findings:
+                        - analyzer_name: "composition-analyzer"
+                          scope: { type: "stage", id: "1b2c3d4e-5f60-4718-9a0b-1c2d3e4f5061" }
+                          finding:
+                            severity: "warning"
+                            description: "one category holds 75% of this stage's total slots"
+                            reason: "a stage where one category supplies most of the slots tests a narrower range of mod conditions than its category count suggests"
+                            recommendation: "rebalance slot counts across categories, or reconsider whether this stage needs that many categories"
+                      warnings:
+                        - analyzer_name: "composition-analyzer"
+                          scope: { type: "stage", id: "1b2c3d4e-5f60-4718-9a0b-1c2d3e4f5061" }
+                          finding:
+                            severity: "warning"
+                            description: "one category holds 75% of this stage's total slots"
+                            reason: "a stage where one category supplies most of the slots tests a narrower range of mod conditions than its category count suggests"
+                            recommendation: "rebalance slot counts across categories, or reconsider whether this stage needs that many categories"
+                      recommendations:
+                        - "rebalance slot counts across categories, or reconsider whether this stage needs that many categories"
+                      statistics:
+                        total_analyses: 4
+                        total_findings: 1
+                        findings_warning: 1
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+components:
+  parameters:
+    TournamentId:
+      name: tournamentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StageId:
+      name: stageId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SlotId:
+      name: slotId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    BeatmapId:
+      name: beatmapId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque pagination cursor from a previous response's `pagination.next_cursor`.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+
+  schemas:
+    ScopeType:
+      type: string
+      enum: [tournament, stage, category, beatmap]
+
+    Scope:
+      type: object
+      required: [type, id]
+      properties:
+        type: { $ref: "#/components/schemas/ScopeType" }
+        id: { type: string, format: uuid }
+
+    Severity:
+      type: string
+      enum: [info, warning, critical]
+
+    CursorPage:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page, or null if there isn't one.
+        has_more: { type: boolean }
+
+    TournamentConfiguration:
+      type: object
+      required: [name, stages]
+      properties:
+        name: { type: string, minLength: 1 }
+        edition: { type: string }
+        stages:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/StageConfiguration" }
+
+    StageConfiguration:
+      type: object
+      required: [name, order, categories]
+      properties:
+        name: { type: string, minLength: 1 }
+        order: { type: integer, minimum: 1 }
+        categories:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/CategoryConfiguration" }
+
+    CategoryConfiguration:
+      type: object
+      required: [name, order, slotCount]
+      properties:
+        name: { type: string, minLength: 1 }
+        order: { type: integer, minimum: 1 }
+        slotCount: { type: integer, minimum: 1 }
+
+    TournamentSummary:
+      type: object
+      required: [id, name, stage_count]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string }
+        edition: { type: string }
+        stage_count: { type: integer, readOnly: true }
+
+    Tournament:
+      type: object
+      required: [id, name, stages]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string }
+        edition: { type: string }
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/Stage" }
+
+    Stage:
+      type: object
+      required: [id, name, order, categories]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string }
+        order: { type: integer }
+        categories:
+          type: array
+          items: { $ref: "#/components/schemas/Category" }
+
+    Category:
+      type: object
+      required: [id, name, order, slots]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        name: { type: string }
+        order: { type: integer }
+        slots:
+          type: array
+          items: { $ref: "#/components/schemas/Slot" }
+
+    Slot:
+      type: object
+      required: [id, position]
+      description: >
+        beatmap_id is the only beatmap reference — Slot never embeds a
+        full Beatmap (docs/06-domain-model.md: Beatmap is a separate
+        aggregate, referenced by ID only).
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        position: { type: integer }
+        beatmap_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null when the slot is unfilled — a valid, expected pool state (docs/06-domain-model.md).
+
+    Beatmap:
+      type: object
+      required: [id, title, artist, mapper, version]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        title: { type: string }
+        artist: { type: string }
+        mapper: { type: string }
+        version: { type: string, description: Difficulty name. }
+        tags:
+          type: array
+          items: { type: string }
+        ar: { type: number }
+        od: { type: number }
+        cs: { type: number }
+        hp: { type: number }
+        bpm: { type: number, description: Duration-weighted dominant BPM. }
+        star_rating:
+          type: number
+          description: >
+            Not computed by the import pipeline as of this version
+            (docs/08-beatmap-import-pipeline.md); always 0 until a
+            difficulty calculator is introduced. Exposed now so clients
+            don't need a breaking change later.
+        length_seconds: { type: integer }
+        object_count: { type: integer }
+        slider_ratio: { type: number, description: "Sliders / total objects." }
+        osu_file_hash: { type: string, readOnly: true }
+
+    Finding:
+      type: object
+      required: [severity, description, reason, recommendation]
+      properties:
+        severity: { $ref: "#/components/schemas/Severity" }
+        description: { type: string }
+        reason: { type: string, description: Why this matters. }
+        recommendation: { type: string }
+        metrics:
+          type: object
+          additionalProperties: { type: number }
+
+    Analysis:
+      type: object
+      required: [analyzer_name, scope, source_hash, generated_at, findings]
+      properties:
+        analyzer_name: { type: string }
+        scope: { $ref: "#/components/schemas/Scope" }
+        source_hash:
+          type: string
+          description: Deterministic content hash; identical hash means identical input was reproduced (docs/09-analysis-engine-specification.md).
+        generated_at: { type: string, format: date-time }
+        score:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+          description: Analyzer-local quality signal, null if this analyzer doesn't produce one. Never combined across analyzers into a single tournament score.
+        metrics:
+          type: object
+          additionalProperties: { type: number }
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/Finding" }
+
+    Citation:
+      type: object
+      required: [analyzer_name, scope, finding]
+      properties:
+        analyzer_name: { type: string }
+        scope: { $ref: "#/components/schemas/Scope" }
+        finding: { $ref: "#/components/schemas/Finding" }
+
+    ReportSections:
+      type: object
+      required: [summary, findings, warnings, recommendations, statistics]
+      properties:
+        summary:
+          type: string
+          description: Prose narrative, built from Finding descriptions, never raw numbers alone (docs/04-architecture-principles.md Principle 9).
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/Citation" }
+        warnings:
+          type: array
+          description: Same Citations as findings, filtered to severity warning/critical.
+          items: { $ref: "#/components/schemas/Citation" }
+        recommendations:
+          type: array
+          items: { type: string }
+          description: Deduplicated, first-appearance order.
+        statistics:
+          type: object
+          additionalProperties: { type: number }
+
+    Report:
+      type: object
+      required: [scope, generated_at, sections]
+      properties:
+        scope: { $ref: "#/components/schemas/Scope" }
+        generated_at: { type: string, format: date-time }
+        sections: { $ref: "#/components/schemas/ReportSections" }
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+      examples:
+        - type: "https://docs.mappool-analyzer.example/errors/validation-error"
+          title: "Validation Error"
+          status: 422
+          detail: "stages[0].categories must contain at least 1 item."
+          instance: "https://api.mappool-analyzer.example/v1/tournaments"
+          errors:
+            - { field: "stages[0].categories", message: "must contain at least 1 item" }
+
+  responses:
+    BadRequest:
+      description: Malformed request (bad query params, invalid JSON body shape).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ValidationError:
+      description: Well-formed request that fails domain validation (e.g. a TournamentConfiguration violating docs/07's schema).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token
+      description: >
+        Defined for deployments that need access control. v1 does not
+        enforce it globally (see docs/14-api-specification.md#authentication) —
+        appropriate for the project's current self-hosted, single-tenant
+        usage; enabling it later is additive, not a breaking change. The
+        empty alternative in the global `security` requirement below is
+        what makes it optional rather than required: a deployment that
+        wants to require it removes that alternative, not the scheme.
+
+security:
+  - {}
+  - BearerAuth: []
