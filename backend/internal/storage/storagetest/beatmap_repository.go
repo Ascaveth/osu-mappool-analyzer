@@ -142,6 +142,30 @@ func RunBeatmapRepositoryContractTests(t *testing.T, newRepo func() storage.Beat
 		}
 	})
 
+	t.Run("SaveRejectsNilBeatmap", func(t *testing.T) {
+		ctx := context.Background()
+		repo := newRepo()
+
+		if _, err := repo.Save(ctx, nil); err != storage.ErrInvalidBeatmap {
+			t.Errorf("Save(nil) error = %v, want ErrInvalidBeatmap", err)
+		}
+	})
+
+	t.Run("SaveRejectsEmptyHash", func(t *testing.T) {
+		ctx := context.Background()
+		repo := newRepo()
+
+		if _, err := repo.Save(ctx, &domain.Beatmap{Title: "No Hash"}); err != storage.ErrInvalidBeatmap {
+			t.Errorf("Save(empty OsuFileHash) error = %v, want ErrInvalidBeatmap", err)
+		}
+
+		// A second beatmap with a different empty hash must not be
+		// silently merged with the first under a shared "" key.
+		if _, err := repo.Save(ctx, &domain.Beatmap{Title: "Also No Hash"}); err != storage.ErrInvalidBeatmap {
+			t.Errorf("second Save(empty OsuFileHash) error = %v, want ErrInvalidBeatmap", err)
+		}
+	})
+
 	t.Run("SavedRecordsAreIsolatedByID", func(t *testing.T) {
 		ctx := context.Background()
 		repo := newRepo()

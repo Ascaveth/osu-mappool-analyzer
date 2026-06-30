@@ -15,6 +15,11 @@ import (
 // ErrBeatmapNotFound is returned when a lookup finds no matching beatmap.
 var ErrBeatmapNotFound = errors.New("storage: beatmap not found")
 
+// ErrInvalidBeatmap is returned by Save when given a nil beatmap or one
+// with an empty OsuFileHash, since OsuFileHash is the dedup key Save
+// relies on to detect re-imports of the same file.
+var ErrInvalidBeatmap = errors.New("storage: invalid beatmap")
+
 // BeatmapRepository persists and retrieves the immutable Beatmap aggregate
 // (docs/06-domain-model.md#aggregate-boundaries). Implementations must
 // enforce that OsuFileHash uniquely identifies a Beatmap: saving a
@@ -23,7 +28,9 @@ var ErrBeatmapNotFound = errors.New("storage: beatmap not found")
 type BeatmapRepository interface {
 	// Save persists a new beatmap, assigning it an ID if it doesn't have
 	// one. If a beatmap with the same OsuFileHash already exists, Save
-	// returns the existing beatmap instead of creating a duplicate.
+	// returns the existing beatmap instead of creating a duplicate. Save
+	// returns ErrInvalidBeatmap for a nil beatmap or one with an empty
+	// OsuFileHash.
 	Save(ctx context.Context, b *domain.Beatmap) (*domain.Beatmap, error)
 
 	// FindByID returns the beatmap with the given ID, or ErrBeatmapNotFound.

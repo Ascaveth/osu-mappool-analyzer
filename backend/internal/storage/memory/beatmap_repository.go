@@ -29,6 +29,10 @@ func NewBeatmapRepository() *BeatmapRepository {
 }
 
 func (r *BeatmapRepository) Save(_ context.Context, b *domain.Beatmap) (*domain.Beatmap, error) {
+	if b == nil || b.OsuFileHash == "" {
+		return nil, storage.ErrInvalidBeatmap
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
