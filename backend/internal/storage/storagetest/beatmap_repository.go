@@ -17,7 +17,9 @@ import (
 
 // RunBeatmapRepositoryContractTests runs the full BeatmapRepository
 // contract against a fresh repository returned by newRepo for each
-// subtest, so implementations stay isolated from one another.
+// RunBeatmapRepositoryContractTests runs a contract test suite for a BeatmapRepository implementation.
+// Each subtest uses a fresh repository instance from newRepo to verify saving, lookup by ID and hash,
+// deduplication by hash, missing-record errors, and isolation between saved records.
 func RunBeatmapRepositoryContractTests(t *testing.T, newRepo func() storage.BeatmapRepository) {
 	t.Helper()
 

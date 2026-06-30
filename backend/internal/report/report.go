@@ -18,7 +18,8 @@ import (
 // one Engine.Run for a whole-tournament report, or a pre-filtered subtree
 // for a narrower one. Build itself has no knowledge of the Tournament
 // tree; it only narrates the Analyses it's given, keeping it testable
-// against synthetic data and reusable at any scope.
+// Build constructs a report from analysis results for the given scope.
+// It preserves existing findings, warnings, recommendations, and statistics, and sets the generation time from now().
 func Build(scope domain.Scope, analyses []domain.Analysis, now func() time.Time) domain.Report {
 	citations := citationsFrom(analyses)
 
@@ -48,7 +49,8 @@ func Build(scope domain.Scope, analyses []domain.Analysis, now func() time.Time)
 // citationsFrom flattens every Analysis's Findings into Citations, sorted
 // by analyzer name then scope ID then severity (critical first) so a
 // Report's Findings section has a stable, deterministic order regardless
-// of map iteration or Analysis ordering upstream.
+// citationsFrom flattens analysis findings into a deterministically ordered list of citations.
+// The returned citations are ordered by analyzer name, then scope ID, and then by severity with higher-severity findings first.
 func citationsFrom(analyses []domain.Analysis) []domain.Citation {
 	sorted := append([]domain.Analysis(nil), analyses...)
 	sort.SliceStable(sorted, func(i, j int) bool {
@@ -74,6 +76,7 @@ func citationsFrom(analyses []domain.Analysis) []domain.Citation {
 	return citations
 }
 
+// severityRank maps a severity to its sort order.
 func severityRank(s domain.Severity) int {
 	switch s {
 	case domain.SeverityCritical:
@@ -88,7 +91,7 @@ func severityRank(s domain.Severity) int {
 // recommendations deduplicates Finding.Recommendation strings, preserving
 // the order each was first cited in — later analyzers independently
 // reaching the same recommendation (e.g. "diversify mapper selection")
-// should not repeat it.
+// recommendations returns the unique non-empty recommendation strings from the citations in first-seen order.
 func recommendations(citations []domain.Citation) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -104,7 +107,9 @@ func recommendations(citations []domain.Citation) []string {
 
 // statistics summarizes the Analyses and Citations with counts only —
 // the raw-number content Architecture Principle 9 keeps out of Summary
-// belongs here instead, in its own clearly-labeled section.
+// statistics computes count-based report metrics from analyses and citations.
+// It includes total analyses, total findings, analyses with scores, the average
+// score across scored analyses, and finding counts by severity.
 func statistics(analyses []domain.Analysis, citations []domain.Citation) map[string]float64 {
 	stats := map[string]float64{
 		"total_analyses": float64(len(analyses)),
@@ -141,7 +146,8 @@ func statistics(analyses []domain.Analysis, citations []domain.Citation) map[str
 // summary writes the narrative section: what happened and why it
 // matters, built entirely out of Finding.Description text analyzers
 // already wrote, never out of raw Statistics values
-// (docs/04-architecture-principles.md Principle 9).
+// summary builds the report narrative from citations and aggregate statistics.
+// The statistics map must include the total number of analysis results under "total_analyses".
 func summary(citations []domain.Citation, stats map[string]float64) string {
 	if len(citations) == 0 {
 		return fmt.Sprintf("No findings were raised across %d analysis result(s).", int(stats["total_analyses"]))
@@ -175,6 +181,7 @@ func summary(citations []domain.Citation, stats map[string]float64) string {
 	return b.String()
 }
 
+// describe concatenates the finding descriptions from the given citations, separated by "; ".
 func describe(citations []domain.Citation) string {
 	descs := make([]string, len(citations))
 	for i, c := range citations {

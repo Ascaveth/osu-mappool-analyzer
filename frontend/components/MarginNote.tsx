@@ -13,6 +13,12 @@ const ANALYZER_LABEL: Record<string, string> = {
   "diversity-analyzer": "Diversity",
 };
 
+/**
+ * Renders a margin note for a citation.
+ *
+ * @param citation - The citation data to display
+ * @returns A margin note showing the severity marker, finding text, reason, and source label
+ */
 export function MarginNote({ citation }: { citation: Citation }) {
   return (
     <div className="note">

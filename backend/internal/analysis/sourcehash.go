@@ -18,7 +18,8 @@ import (
 // (docs/07-tournament-configuration.md, "Updating a configuration").
 //
 // Stages/Categories/Slots are sorted by Order/Position before hashing so
-// the result doesn't depend on slice ordering the caller happened to use.
+// sourceHash computes a deterministic hash for an analyzer and scope within a tournament.
+// It includes the scope identity and the visible tournament data for that scope, so the result is independent of slice ordering.
 func sourceHash(t *domain.Tournament, scope domain.Scope, analyzerName string) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "analyzer=%s|scope=%s:%s|", analyzerName, scope.Type, scope.ID)
@@ -43,6 +44,8 @@ func sourceHash(t *domain.Tournament, scope domain.Scope, analyzerName string) s
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// writeTournament writes a tournament's identity and its stages to the hash in order.
+// It serializes the tournament name and edition, then writes each stage sorted by order.
 func writeTournament(h hash.Hash, t *domain.Tournament) {
 	fmt.Fprintf(h, "tournament[name=%s,edition=%s]", t.Name, t.Edition)
 	stages := append([]domain.Stage(nil), t.Stages...)
@@ -52,6 +55,8 @@ func writeTournament(h hash.Hash, t *domain.Tournament) {
 	}
 }
 
+// writeStage writes a stage and its categories to the hash stream in a stable order.
+// It includes the stage name and order, then writes each category sorted by order.
 func writeStage(h hash.Hash, s *domain.Stage) {
 	fmt.Fprintf(h, "stage[name=%s,order=%d]", s.Name, s.Order)
 	categories := append([]domain.Category(nil), s.Categories...)
@@ -61,6 +66,8 @@ func writeStage(h hash.Hash, s *domain.Stage) {
 	}
 }
 
+// writeCategory writes a deterministic representation of a category and its slots to h.
+// Slots are serialized in ascending position order, and each slot records whether it is empty or contains a beatmap hash.
 func writeCategory(h hash.Hash, c *domain.Category) {
 	fmt.Fprintf(h, "category[name=%s,order=%d]", c.Name, c.Order)
 	slots := append([]domain.Slot(nil), c.Slots...)
@@ -74,6 +81,7 @@ func writeCategory(h hash.Hash, c *domain.Category) {
 	}
 }
 
+// writeBeatmap writes a beatmap identity to h using the beatmap's osu file hash.
 func writeBeatmap(h hash.Hash, b *domain.Beatmap) {
 	fmt.Fprintf(h, "beatmap[hash=%s]", b.OsuFileHash)
 }

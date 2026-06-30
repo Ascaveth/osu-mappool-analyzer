@@ -18,7 +18,7 @@ import (
 // orderedHitObjects returns a beatmap's hit objects sorted by start time.
 // The import pipeline already produces them in file order (which is
 // always chronological in a valid .osu file), but pattern analyzers sort
-// defensively rather than assume an upstream invariant they don't own.
+// orderedHitObjects returns a copy of bm.HitObjects sorted by StartTime in stable order.
 func orderedHitObjects(bm *domain.Beatmap) []domain.HitObject {
 	objects := append([]domain.HitObject(nil), bm.HitObjects...)
 	sort.SliceStable(objects, func(i, j int) bool { return objects[i].StartTime < objects[j].StartTime })

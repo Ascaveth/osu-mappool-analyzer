@@ -3,6 +3,14 @@ import { MarginNote } from "./MarginNote";
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
+/**
+ * Renders a stage section with its categories, slots, and margin notes.
+ *
+ * @param stage - The stage to display.
+ * @param stageNotes - Citations shown with the stage header.
+ * @param categoryNotes - Citations grouped by category ID.
+ * @param delay - Animation delay in milliseconds.
+ */
 export function StageSection({
   stage,
   stageNotes,

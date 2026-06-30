@@ -107,6 +107,10 @@ func (ProgressionAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 	return analysis.Result{Score: &score, Metrics: metrics, Findings: findings}, nil
 }
 
+// median returns the median value from a set of numbers.
+//
+// It returns 0 for an empty slice. For an even number of values, it returns
+// the average of the two middle values after sorting.
 func median(values []float64) float64 {
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)

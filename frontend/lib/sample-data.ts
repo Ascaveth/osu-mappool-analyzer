@@ -6,7 +6,18 @@ import type { Tournament, Report } from "./types";
 // deliberately imperfect: a balanced Qualifiers stage, a Round of 16
 // that over-relies on one mod category, and a Grand Finals with a
 // difficulty cooldown and a repeated song — exactly the kind of issues
-// docs/12-tournament-analyzers.md's analyzers exist to catch.
+/**
+ * Builds a beatmap object with a version string derived from the AR value.
+ *
+ * @param id - Beatmap identifier
+ * @param title - Beatmap title
+ * @param artist - Beatmap artist
+ * @param mapper - Beatmap creator
+ * @param ar - Approach rate used to format the version string
+ * @param od - Overall difficulty
+ * @param bpm - Beatmap tempo
+ * @returns A beatmap object containing the provided fields and a formatted `version`
+ */
 
 function bm(
   id: string,

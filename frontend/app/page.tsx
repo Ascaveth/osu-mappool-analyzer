@@ -4,6 +4,9 @@ import { StageSection } from "@/components/StageSection";
 import { tournament, report } from "@/lib/sample-data";
 import type { Citation } from "@/lib/types";
 
+/**
+ * Renders the home page for the tournament report.
+ */
 export default function Home() {
   const { findings } = report.sections;
 

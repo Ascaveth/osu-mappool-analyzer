@@ -7,6 +7,11 @@ const STAT_LABELS: Record<string, string> = {
   findings_critical: "Critical",
 };
 
+/**
+ * Renders the thesis summary and statistic totals.
+ *
+ * @param sections - Report content and statistics to display
+ */
 export function ThesisHero({ sections }: { sections: ReportSections }) {
   return (
     <section className="thesis reveal" style={{ animationDelay: "80ms" }}>

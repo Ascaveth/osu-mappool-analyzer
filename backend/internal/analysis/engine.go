@@ -145,7 +145,8 @@ func (e *Engine) Run(ctx context.Context, tournament *domain.Tournament) ([]doma
 }
 
 // validateFindings enforces docs/06-domain-model.md's domain rule that
-// Severity, Reason, and Recommendation are required on every Finding.
+// validateFindings reports an error if any finding has an invalid severity or is missing a reason or recommendation.
+// It returns the first validation error encountered and includes the finding index in the error message.
 func validateFindings(findings []domain.Finding) error {
 	for i, f := range findings {
 		switch f.Severity {

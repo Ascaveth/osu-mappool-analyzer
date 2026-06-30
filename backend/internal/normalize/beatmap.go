@@ -25,7 +25,9 @@ const defaultBeatLengthMs = 500.0 // 120 BPM
 // Beatmap converts a parsed .osu file plus its original source bytes into
 // a domain.Beatmap. The original bytes are required (rather than just the
 // parsed struct) so OsuFileHash reflects the exact source file, including
-// formatting differences a re-parse would normalize away.
+// Beatmap builds a domain beatmap from raw parsed beatmap data and the original source bytes.
+// It preserves raw metadata, normalizes difficulty, timing points, and hit objects, and computes
+// derived values such as BPM, length, slider ratio, and source-file hash. Returns an error if raw is nil.
 func Beatmap(raw *osufile.RawBeatmap, sourceBytes []byte) (*domain.Beatmap, error) {
 	if raw == nil {
 		return nil, fmt.Errorf("normalize: raw beatmap is nil")
@@ -69,7 +71,7 @@ type difficultySettings struct {
 }
 
 // parseDifficulty reads HP/CS/OD/AR. AR was introduced in format v8; older
-// maps inherit AR from OD, matching osu!'s own documented fallback.
+// Otherwise, it sets AR to the overall difficulty value.
 func parseDifficulty(d map[string]string, formatVersion int) (difficultySettings, error) {
 	hp, err := requireFloat(d, "HPDrainRate")
 	if err != nil {
@@ -94,6 +96,8 @@ func parseDifficulty(d map[string]string, formatVersion int) (difficultySettings
 	return difficultySettings{ar: ar, od: od, cs: cs, hp: hp}, nil
 }
 
+// requireFloat returns the parsed value of a required [Difficulty] field.
+// It reports an error if the field is missing or cannot be parsed as a float.
 func requireFloat(d map[string]string, key string) (float64, error) {
 	raw, ok := d[key]
 	if !ok {
@@ -106,6 +110,7 @@ func requireFloat(d map[string]string, key string) (float64, error) {
 	return v, nil
 }
 
+// parseFloatOr parses raw as a float64 and returns fallback if parsing fails.
 func parseFloatOr(raw string, fallback float64) float64 {
 	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
 	if err != nil {
@@ -114,6 +119,8 @@ func parseFloatOr(raw string, fallback float64) float64 {
 	return v
 }
 
+// splitTags splits a tags string into whitespace-separated fields.
+// It returns nil when the input is blank or contains only whitespace.
 func splitTags(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -121,6 +128,8 @@ func splitTags(raw string) []string {
 	return strings.Fields(raw)
 }
 
+// normalizeTimingPoints converts raw timing points into domain timing points and
+// sets BPM for uninherited points with a positive beat length.
 func normalizeTimingPoints(points []osufile.RawTimingPoint) []domain.TimingPoint {
 	out := make([]domain.TimingPoint, 0, len(points))
 	for _, p := range points {
@@ -148,6 +157,7 @@ type timingState struct {
 	velocity   float64 // slider velocity multiplier from the active inherited line
 }
 
+// buildTimingStates creates a sorted timeline of effective beat length and slider velocity changes from timing points.
 func buildTimingStates(points []osufile.RawTimingPoint) []timingState {
 	sorted := make([]osufile.RawTimingPoint, len(points))
 	copy(sorted, points)
@@ -172,6 +182,10 @@ func buildTimingStates(points []osufile.RawTimingPoint) []timingState {
 	return states
 }
 
+// stateAt returns the effective timing state at time t.
+// If no timing states are available, it returns the default beat length and
+// a velocity of 1.0. If t falls before the first state, it returns the first
+// state's beat length with a velocity of 1.0.
 func stateAt(states []timingState, t float64) timingState {
 	if len(states) == 0 {
 		return timingState{beatLength: defaultBeatLengthMs, velocity: 1.0}
@@ -183,6 +197,9 @@ func stateAt(states []timingState, t float64) timingState {
 	return states[idx-1]
 }
 
+// normalizeHitObjects converts raw hit objects into domain hit objects and counts sliders.
+// It preserves circles and spinners, derives slider end times from timing data, and drops unsupported objects.
+// It returns the normalized hit objects and the number of sliders encountered.
 func normalizeHitObjects(raw []osufile.RawHitObject, rawTimingPoints []osufile.RawTimingPoint, sliderMultiplier float64) ([]domain.HitObject, int) {
 	states := buildTimingStates(rawTimingPoints)
 
@@ -229,7 +246,9 @@ func normalizeHitObjects(raw []osufile.RawHitObject, rawTimingPoints []osufile.R
 }
 
 // sliderDurationMs implements osu!'s slider duration formula:
-// duration = pixelLength * slides / (100 * sliderMultiplier * velocity) * beatLength
+// sliderDurationMs computes the duration of an osu! slider in milliseconds.
+// It uses the slider's pixel length, repeat count, active beat length, inherited
+// velocity, and map slider multiplier.
 func sliderDurationMs(pixelLength float64, slides int, beatLength, velocity, sliderMultiplier float64) float64 {
 	if pixelLength <= 0 || slides <= 0 || sliderMultiplier <= 0 {
 		return 0
@@ -244,7 +263,7 @@ func sliderDurationMs(pixelLength float64, slides int, beatLength, velocity, sli
 
 // dominantBPM picks the uninherited BPM that covers the most playtime,
 // since a single representative BPM is more useful to analyzers/reports
-// than a list of every timing change.
+// dominantBPM returns the BPM whose uninherited timing segments cover the most playtime.
 func dominantBPM(points []osufile.RawTimingPoint, hitObjects []domain.HitObject) float64 {
 	uninherited := make([]osufile.RawTimingPoint, 0, len(points))
 	for _, p := range points {
@@ -287,10 +306,12 @@ func dominantBPM(points []osufile.RawTimingPoint, hitObjects []domain.HitObject)
 	return bestBPM
 }
 
+// roundBPM rounds a BPM value to two decimal places.
 func roundBPM(bpm float64) float64 {
 	return float64(int(bpm*100+0.5)) / 100
 }
 
+// lengthSeconds computes the duration covered by the hit objects, rounded to the nearest second.
 func lengthSeconds(hitObjects []domain.HitObject) int {
 	if len(hitObjects) == 0 {
 		return 0
@@ -308,10 +329,12 @@ func lengthSeconds(hitObjects []domain.HitObject) int {
 	return int((end - start).Round(time.Second).Seconds())
 }
 
+// msToDuration converts a millisecond value to a time.Duration.
 func msToDuration(ms float64) time.Duration {
 	return time.Duration(ms * float64(time.Millisecond))
 }
 
+// hashSource returns the SHA-256 hash of sourceBytes as a lowercase hexadecimal string.
 func hashSource(sourceBytes []byte) string {
 	sum := sha256.Sum256(sourceBytes)
 	return hex.EncodeToString(sum[:])

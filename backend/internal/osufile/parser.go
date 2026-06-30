@@ -27,7 +27,13 @@ const (
 // Parse reads a .osu file and returns its raw, format-faithful contents.
 // It returns ErrNotAnOsuFile if the input does not look like a .osu file,
 // and otherwise tolerates malformed individual lines by skipping them —
-// a single bad hit object line should not fail an entire import.
+// Parse reads an .osu beatmap and returns a raw representation of its contents.
+//
+// It requires a recognizable `osu file format vNN` header and skips malformed
+// lines while preserving the rest of the file.
+//
+// @returns The parsed beatmap and a nil error on success. If the input does not
+// match an .osu file header or reading fails, it returns an error.
 func Parse(r io.Reader) (*RawBeatmap, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -84,6 +90,10 @@ func Parse(r io.Reader) (*RawBeatmap, error) {
 	return raw, nil
 }
 
+// parseFormatVersion parses an osu! beatmap file header and returns its format version.
+// It accepts headers of the form "osu file format vNN".
+// 
+// @returns The parsed format version and true on success, or 0 and false if the header is invalid.
 func parseFormatVersion(header string) (int, bool) {
 	const prefix = "osu file format v"
 	if !strings.HasPrefix(header, prefix) {
@@ -96,6 +106,7 @@ func parseFormatVersion(header string) (int, bool) {
 	return n, true
 }
 
+// sectionFromHeader maps an .osu section header to its internal section value.
 func sectionFromHeader(header string) section {
 	switch strings.Trim(header, "[]") {
 	case "General":
@@ -113,7 +124,8 @@ func sectionFromHeader(header string) section {
 	}
 }
 
-// parseKeyValue parses "Key: Value" lines used by [General]/[Metadata]/[Difficulty].
+// parseKeyValue stores a trimmed key-value pair from a "Key: Value" line.
+// It ignores lines without a colon or with an empty key.
 func parseKeyValue(line string, dst map[string]string) {
 	idx := strings.Index(line, ":")
 	if idx < 0 {
@@ -128,7 +140,11 @@ func parseKeyValue(line string, dst map[string]string) {
 }
 
 // parseTimingPoint parses one comma-separated [TimingPoints] line:
-// offset,beatLength,meter,sampleSet,sampleIndex,volume,uninherited,effects
+// parseTimingPoint parses a timing point line.
+//
+// It accepts the comma-separated timing point fields used in .osu files and
+// fills the required timing values plus the meter and uninherited flag when
+// present.
 func parseTimingPoint(line string) (RawTimingPoint, bool) {
 	fields := strings.Split(line, ",")
 	if len(fields) < 2 {
@@ -165,7 +181,10 @@ func parseTimingPoint(line string) (RawTimingPoint, bool) {
 }
 
 // parseHitObject parses one comma-separated [HitObjects] line:
-// x,y,time,type,hitSound,objectParams...,hitSample
+// parseHitObject parses a raw hit object line into a RawHitObject.
+//
+// It recognizes circles, sliders, spinners, and unknown object types. Slider
+// fields such as curve data, repeat count, and length are parsed when present.
 func parseHitObject(line string) (RawHitObject, bool) {
 	fields := strings.Split(line, ",")
 	if len(fields) < 4 {

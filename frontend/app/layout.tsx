@@ -26,6 +26,12 @@ export const metadata: Metadata = {
   description: "Analysis Engine report for the Spring Invitational 2026 mappool.",
 };
 
+/**
+ * Renders the application root layout.
+ *
+ * @param children - The page content to render inside the document body.
+ * @returns The root HTML structure for the application.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
