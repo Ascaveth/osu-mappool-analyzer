@@ -9,23 +9,32 @@ import (
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
-// landingObjects returns circles and slider starts, in time order,
-// excluding spinners. A spinner has no fixed "landing position" — the
-// cursor leaves it at an arbitrary point determined by spin direction and
-// timing, not by map design — so including it would make jump
-// distance/angle measurements meaningless at that transition. X/Y is each
-// object's start position; slider end positions aren't modeled (see
-// domain.HitObject doc comment), so jump distance approximates start-to-start
-// landingObjects returns the ordered hit objects used for jump calculations.
-// Spinners are excluded because they do not have a fixed landing position.
-func landingObjects(bm *domain.Beatmap) []domain.HitObject {
-	var out []domain.HitObject
+// landingObjects returns circles and slider starts, in time order, split
+// into runs that break at every spinner. A spinner has no fixed "landing
+// position" — the cursor leaves it at an arbitrary point determined by
+// spin direction and timing, not by map design — so a jump computed
+// between the object before a spinner and the object after it would
+// describe a transition that doesn't exist on the map. Each returned run
+// is a maximal stretch of circles/slider-starts with no spinner inside
+// it; jump distance/angle are only ever computed within one run, never
+// across the break a spinner introduces.
+func landingObjects(bm *domain.Beatmap) [][]domain.HitObject {
+	var runs [][]domain.HitObject
+	var current []domain.HitObject
 	for _, h := range orderedHitObjects(bm) {
-		if h.Type != domain.HitObjectSpinner {
-			out = append(out, h)
+		if h.Type == domain.HitObjectSpinner {
+			if len(current) > 0 {
+				runs = append(runs, current)
+				current = nil
+			}
+			continue
 		}
+		current = append(current, h)
 	}
-	return out
+	if len(current) > 0 {
+		runs = append(runs, current)
+	}
+	return runs
 }
 
 // distance computes the straight-line distance between two hit objects' start positions.
@@ -53,23 +62,25 @@ func (JumpDistanceAnalyzer) Analyze(_ context.Context, in analysis.Input) (analy
 		return analysis.Result{}, fmt.Errorf("pattern: beatmap %q not found in tournament", in.Scope.ID)
 	}
 
-	objects := landingObjects(bm)
-	if len(objects) < 2 {
+	runs := landingObjects(bm)
+
+	min, max, sum, count := math.Inf(1), 0.0, 0.0, 0
+	for _, objects := range runs {
+		for i := 1; i < len(objects); i++ {
+			d := distance(objects[i-1], objects[i])
+			if d < min {
+				min = d
+			}
+			if d > max {
+				max = d
+			}
+			sum += d
+			count++
+		}
+	}
+	if count == 0 {
 		return analysis.Result{Metrics: map[string]float64{"jump_count": 0}}, nil
 	}
-
-	min, max, sum := math.Inf(1), 0.0, 0.0
-	for i := 1; i < len(objects); i++ {
-		d := distance(objects[i-1], objects[i])
-		if d < min {
-			min = d
-		}
-		if d > max {
-			max = d
-		}
-		sum += d
-	}
-	count := len(objects) - 1
 
 	return analysis.Result{Metrics: map[string]float64{
 		"jump_count":        float64(count),
@@ -124,21 +135,20 @@ func (JumpAngleAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 		return analysis.Result{}, fmt.Errorf("pattern: beatmap %q not found in tournament", in.Scope.ID)
 	}
 
-	objects := landingObjects(bm)
-	if len(objects) < 3 {
-		return analysis.Result{Metrics: map[string]float64{"angle_count": 0}}, nil
-	}
+	runs := landingObjects(bm)
 
 	sum, count, sharpTurns := 0.0, 0, 0
-	for i := 1; i < len(objects)-1; i++ {
-		angle, ok := angleBetween(objects[i-1], objects[i], objects[i+1])
-		if !ok {
-			continue
-		}
-		sum += angle
-		count++
-		if angle < sharpTurnThresholdDegrees {
-			sharpTurns++
+	for _, objects := range runs {
+		for i := 1; i < len(objects)-1; i++ {
+			angle, ok := angleBetween(objects[i-1], objects[i], objects[i+1])
+			if !ok {
+				continue
+			}
+			sum += angle
+			count++
+			if angle < sharpTurnThresholdDegrees {
+				sharpTurns++
+			}
 		}
 	}
 

@@ -2,6 +2,7 @@ package tournament
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
@@ -134,6 +135,33 @@ func TestProgressionAnalyzer_FlagsSpike(t *testing.T) {
 	}
 	if len(result.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1 (spike from 7 to 20)", len(result.Findings))
+	}
+}
+
+func TestProgressionAnalyzer_SpikeStillDetectedDespiteEarlierRegressions(t *testing.T) {
+	// Deltas: -1,-1,1,1,-1,41. The median across ALL deltas (including
+	// the three negative ones) is 0, which would silently suppress
+	// every spike check (med > 0 fails) no matter how large the final
+	// jump is. The spike baseline must be computed from positive deltas
+	// only (1,1,41 -> median 1), so the 41-point jump (>2x that median)
+	// is still flagged.
+	tournament := buildProgressionTournament([]float64{10, 9, 8, 9, 10, 9, 50})
+
+	result, err := ProgressionAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeTournament, ID: "t-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+
+	foundSpike := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "increases") {
+			foundSpike = true
+		}
+	}
+	if !foundSpike {
+		t.Error("expected a spike finding for the 9->50 jump, even though earlier regressions pull the all-deltas median to 0")
 	}
 }
 

@@ -82,6 +82,13 @@ func TestValidateConfiguration_AllowsDuplicateCategoryNamesAcrossDifferentStages
 	}
 }
 
+func TestValidateConfiguration_NilTournamentReturnsErrorIssueInsteadOfPanicking(t *testing.T) {
+	issues := ValidateConfiguration(nil)
+	if !HasErrors(issues) {
+		t.Fatalf("ValidateConfiguration(nil) = %+v, want a hard error issue", issues)
+	}
+}
+
 func TestHasErrors(t *testing.T) {
 	if HasErrors(nil) {
 		t.Error("HasErrors(nil) = true, want false")

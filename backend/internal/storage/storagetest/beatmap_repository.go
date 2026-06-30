@@ -101,6 +101,47 @@ func RunBeatmapRepositoryContractTests(t *testing.T, newRepo func() storage.Beat
 		}
 	})
 
+	t.Run("ReturnedRecordsAreIsolatedFromRepositoryState", func(t *testing.T) {
+		ctx := context.Background()
+		repo := newRepo()
+
+		saved, err := repo.Save(ctx, &domain.Beatmap{Title: "Original", OsuFileHash: "hash-mutate"})
+		if err != nil {
+			t.Fatalf("Save returned error: %v", err)
+		}
+
+		// Mutate the caller's copy returned by Save...
+		saved.Title = "Mutated"
+
+		// ...and confirm the repository's own record is unaffected, both
+		// via FindByID and FindByHash.
+		byID, err := repo.FindByID(ctx, saved.ID)
+		if err != nil {
+			t.Fatalf("FindByID returned error: %v", err)
+		}
+		if byID.Title != "Original" {
+			t.Errorf("FindByID(id).Title = %q after mutating Save's returned pointer, want %q (repository state corrupted)", byID.Title, "Original")
+		}
+
+		byHash, err := repo.FindByHash(ctx, "hash-mutate")
+		if err != nil {
+			t.Fatalf("FindByHash returned error: %v", err)
+		}
+		if byHash.Title != "Original" {
+			t.Errorf("FindByHash.Title = %q after mutating Save's returned pointer, want %q (repository state corrupted)", byHash.Title, "Original")
+		}
+
+		// Mutating one FindByID result must not affect a second, separate read.
+		byID.Title = "Mutated Again"
+		again, err := repo.FindByID(ctx, saved.ID)
+		if err != nil {
+			t.Fatalf("FindByID returned error: %v", err)
+		}
+		if again.Title != "Original" {
+			t.Errorf("FindByID(id).Title = %q after mutating a previous FindByID result, want %q", again.Title, "Original")
+		}
+	})
+
 	t.Run("SavedRecordsAreIsolatedByID", func(t *testing.T) {
 		ctx := context.Background()
 		repo := newRepo()

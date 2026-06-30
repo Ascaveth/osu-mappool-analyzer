@@ -69,7 +69,12 @@ func TestJumpDistanceAnalyzer_ComputesDistances(t *testing.T) {
 	}
 }
 
-func TestJumpDistanceAnalyzer_ExcludesSpinners(t *testing.T) {
+func TestJumpDistanceAnalyzer_BreaksRunAtSpinners(t *testing.T) {
+	// The cursor's exit position from a spinner is undefined (depends on
+	// spin direction/timing, not map design), so the object after a
+	// spinner must not be paired with the object before it: that single
+	// circle before and the single circle after each form a run of one,
+	// producing zero jumps, not a jump across the spinner.
 	bm := &domain.Beatmap{ID: "bm-1", HitObjects: []domain.HitObject{
 		circle(0, 0, 0),
 		spinner(400, 300, 500, 900),
@@ -82,11 +87,8 @@ func TestJumpDistanceAnalyzer_ExcludesSpinners(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Analyze returned error: %v", err)
 	}
-	if got := result.Metrics["jump_count"]; got != 1 {
-		t.Fatalf("jump_count = %v, want 1 (spinner excluded)", got)
-	}
-	if got := result.Metrics["jump_distance_avg"]; got != 100 {
-		t.Errorf("jump_distance_avg = %v, want 100 (computed across the spinner, not into it)", got)
+	if got := result.Metrics["jump_count"]; got != 0 {
+		t.Fatalf("jump_count = %v, want 0 (spinner breaks the run, no jump spans it)", got)
 	}
 }
 
@@ -209,6 +211,46 @@ func TestStreamBurstAnalyzer_WidelySpacedNotesProduceNoRuns(t *testing.T) {
 	}
 	if got := result.Metrics["stream_count"]; got != 0 {
 		t.Errorf("stream_count = %v, want 0", got)
+	}
+}
+
+func TestStreamBurstAnalyzer_UsesLocalTimingNotGlobalBPM(t *testing.T) {
+	// bm.BPM (dominant) reflects only the first, longer segment (120 BPM,
+	// beatLength 500ms). The second segment slows to 60 BPM (beatLength
+	// 1000ms) starting at 10000ms. Notes spaced 200ms apart are a stream
+	// at 120 BPM (1/4 snap ~143ms threshold) but would NOT qualify at 60
+	// BPM (1/4 snap ~287ms threshold still covers 200ms — pick a spacing
+	// that distinguishes the two): use 220ms spacing, which is within the
+	// 120 BPM threshold (~143ms) only if read against the wrong segment;
+	// pick values that clearly differ between local and global lookup.
+	bm := &domain.Beatmap{
+		ID:  "bm-1",
+		BPM: 120, // dominant/global BPM: the first, longer segment
+		TimingPoints: []domain.TimingPoint{
+			{Offset: ms(0), BeatLength: 500, Uninherited: true},     // 120 BPM
+			{Offset: ms(10000), BeatLength: 1000, Uninherited: true}, // 60 BPM
+		},
+		HitObjects: []domain.HitObject{
+			circle(0, 0, 10000),
+			circle(10, 0, 10220),
+			circle(20, 0, 10440),
+			circle(30, 0, 10660),
+		},
+	}
+
+	result, err := StreamBurstAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: buildTournament(bm), Scope: scope(bm.ID),
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	// At the active local tempo (60 BPM, beatLength 1000ms), 1/4 snap
+	// tolerance is 1000/4*1.15 = 287.5ms, so 220ms spacing qualifies as
+	// one run of 4 (a burst). Using the global 120 BPM beatLength
+	// (500ms) instead, the tolerance would be 143.75ms, which 220ms
+	// spacing would NOT satisfy, breaking the run into singletons.
+	if got := result.Metrics["burst_count"]; got != 1 {
+		t.Errorf("burst_count = %v, want 1 (local 60 BPM timing should classify this as one run)", got)
 	}
 }
 

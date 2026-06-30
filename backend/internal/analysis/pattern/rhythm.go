@@ -3,6 +3,7 @@ package pattern
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
@@ -58,8 +59,14 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 		return analysis.Result{Metrics: zero}, nil
 	}
 
-	beatLength := time.Duration(60000.0/bm.BPM) * time.Millisecond
-	snapThreshold := time.Duration(float64(beatLength) / streamSnapDivisor * snapToleranceRatio)
+	timingPoints := append([]domain.TimingPoint(nil), bm.TimingPoints...)
+	sort.SliceStable(timingPoints, func(i, j int) bool { return timingPoints[i].Offset < timingPoints[j].Offset })
+
+	// fallbackBeatLengthMs covers fixtures/maps with no usable uninherited
+	// timing point preceding a given object (e.g. synthetic test data that
+	// only sets BPM directly): fall back to the beatmap's dominant BPM
+	// rather than treating the interval as having no active tempo.
+	fallbackBeatLengthMs := 60000.0 / bm.BPM
 
 	burstCount, streamCount, longestRun := 0, 0, 0
 	runLength := 1
@@ -77,6 +84,8 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 
 	for i := 1; i < len(circles); i++ {
 		ioi := circles[i].StartTime - circles[i-1].StartTime
+		beatLengthMs := localBeatLengthMs(timingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
+		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
 		if ioi <= snapThreshold {
 			runLength++
 			continue
@@ -91,6 +100,27 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 		"stream_count":       float64(streamCount),
 		"longest_run_length": float64(longestRun),
 	}}, nil
+}
+
+// localBeatLengthMs returns the beat length (ms) of the uninherited timing
+// point active at time t — the most recent uninherited point at or before
+// t in sortedPoints (sorted ascending by Offset). Falls back to
+// fallbackMs when no such point exists (e.g. t precedes every timing
+// point, or the beatmap has none at all).
+func localBeatLengthMs(sortedPoints []domain.TimingPoint, t time.Duration, fallbackMs float64) float64 {
+	beatLength := 0.0
+	for _, p := range sortedPoints {
+		if p.Offset > t {
+			break
+		}
+		if p.Uninherited && p.BeatLength > 0 {
+			beatLength = p.BeatLength
+		}
+	}
+	if beatLength > 0 {
+		return beatLength
+	}
+	return fallbackMs
 }
 
 var _ analysis.Analyzer = StreamBurstAnalyzer{}

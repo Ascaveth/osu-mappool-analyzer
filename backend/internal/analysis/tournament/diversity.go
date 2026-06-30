@@ -30,9 +30,14 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 		return analysis.Result{}, fmt.Errorf("tournament: stage %q not found in tournament", in.Scope.ID)
 	}
 
+	type songKey struct {
+		artist string
+		title  string
+	}
+
 	bpms := map[float64]bool{}
 	mappers := map[string]bool{}
-	songCounts := map[string]int{}
+	songCounts := map[songKey]int{}
 	filled := 0
 
 	for _, c := range stage.Categories {
@@ -43,7 +48,7 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 			filled++
 			bpms[slot.Beatmap.BPM] = true
 			mappers[slot.Beatmap.Mapper] = true
-			songCounts[slot.Beatmap.Artist+"||"+slot.Beatmap.Title]++
+			songCounts[songKey{artist: slot.Beatmap.Artist, title: slot.Beatmap.Title}]++
 		}
 	}
 

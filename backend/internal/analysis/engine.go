@@ -77,6 +77,9 @@ func NewEngine() *Engine {
 // analyzer with the same Name is already registered — silently
 // overwriting a plugin by name would hide a configuration mistake.
 func (e *Engine) Register(a Analyzer) error {
+	if a == nil {
+		return errors.New("analysis: analyzer must not be nil")
+	}
 	if a.Name() == "" {
 		return errors.New("analysis: analyzer Name must not be empty")
 	}
@@ -107,11 +110,17 @@ func (e *Engine) Run(ctx context.Context, tournament *domain.Tournament) ([]doma
 	var results []domain.Analysis
 	var errs []error
 
+loop:
 	for _, name := range e.order {
 		analyzer := e.analyzers[name]
 		scopes := enumerateScopes(tournament, analyzer.ScopeType())
 
 		for _, scope := range scopes {
+			if err := ctx.Err(); err != nil {
+				errs = append(errs, err)
+				break loop
+			}
+
 			result, err := analyzer.Analyze(ctx, Input{Tournament: tournament, Scope: scope})
 			if err != nil {
 				errs = append(errs, fmt.Errorf("analyzer %q (scope %s/%s): %w", name, scope.Type, scope.ID, err))

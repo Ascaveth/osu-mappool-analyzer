@@ -97,6 +97,28 @@ func TestBeatmap_MissingRequiredDifficultyField(t *testing.T) {
 	}
 }
 
+func TestBeatmap_InvalidApproachRateFailsFast(t *testing.T) {
+	input := `osu file format v14
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+ApproachRate:not-a-number
+
+[TimingPoints]
+0,500,4,2,0,100,1,0
+`
+	raw, err := osufile.Parse(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if _, err := Beatmap(raw, []byte(input)); err == nil {
+		t.Fatal("Beatmap should return an error when ApproachRate is present but unparseable, not silently fall back to OverallDifficulty")
+	}
+}
+
 func TestBeatmap_SameSourceProducesSameHash(t *testing.T) {
 	source, raw := parseTestdata(t, "../osufile/testdata/sample.osu")
 
@@ -137,7 +159,49 @@ func TestBeatmap_ExtremeBPMAndDenseObjectsNormalizeWithoutClamping(t *testing.T)
 	}
 }
 
-func TestBeatmap_MissingTimingPointsFallsBackToDefaultBeatLength(t *testing.T) {
+func TestBeatmap_DominantBPMUsesTrueLatestHitObjectEndTime(t *testing.T) {
+	// A spinner starting at 4000ms ends at 20000ms, but a circle that
+	// starts later (4500ms, and so is the LAST element in file/StartTime
+	// order) ends earlier, at 4500ms. The second uninherited timing
+	// point's segment must be measured against the true latest end time
+	// (20000ms, from the spinner) rather than the last hit object in
+	// slice order (4500ms) — otherwise the second segment is measured as
+	// having ~0 duration and the dominant-BPM selection picks the wrong
+	// segment.
+	input := `osu file format v14
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+
+[TimingPoints]
+0,1000,4,2,0,100,1,0
+5000,100,4,2,0,100,1,0
+
+[HitObjects]
+256,192,4000,8,0,20000,0:0:0:0:
+100,100,4500,1,0,0:0:0:0:
+`
+	raw, err := osufile.Parse(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	bm, err := Beatmap(raw, []byte(input))
+	if err != nil {
+		t.Fatalf("Beatmap returned error: %v", err)
+	}
+
+	// First segment (0-5000ms, 60 BPM) covers 5000ms. Second segment
+	// (5000-20000ms, 600 BPM) covers 15000ms once measured against the
+	// spinner's true end time, so 600 BPM should dominate.
+	if bm.BPM != 600 {
+		t.Errorf("BPM = %v, want 600 (dominant segment measured against the spinner's true end time)", bm.BPM)
+	}
+}
+
+func TestBeatmap_MissingTimingPointsYieldsZeroBPM(t *testing.T) {
 	source, raw := parseTestdata(t, "../osufile/testdata/missing_timing_points.osu")
 
 	bm, err := Beatmap(raw, source)

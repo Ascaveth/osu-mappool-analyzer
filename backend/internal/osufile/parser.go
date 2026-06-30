@@ -217,31 +217,37 @@ func parseHitObject(line string) (RawHitObject, bool) {
 	switch {
 	case typeBits&8 != 0: // spinner: x,y,time,type,hitSound,endTime,hitSample
 		ho.Type = RawHitObjectSpinner
-		if len(fields) > 5 {
-			if et, err := strconv.ParseFloat(strings.TrimSpace(fields[5]), 64); err == nil {
-				ho.EndTime = et
-			}
+		if len(fields) <= 5 {
+			return RawHitObject{}, false
 		}
+		et, err := strconv.ParseFloat(strings.TrimSpace(fields[5]), 64)
+		if err != nil {
+			return RawHitObject{}, false
+		}
+		ho.EndTime = et
 	case typeBits&2 != 0: // slider: x,y,time,type,hitSound,curveType|curvePoints,slides,length,...
 		ho.Type = RawHitObjectSlider
-		ho.Slides = 1
-		if len(fields) > 5 {
-			curve := strings.Split(strings.TrimSpace(fields[5]), "|")
-			if len(curve) > 0 {
-				ho.CurveType = curve[0]
-				ho.CurvePointCount = len(curve) - 1
-			}
+		if len(fields) <= 7 {
+			return RawHitObject{}, false
 		}
-		if len(fields) > 6 {
-			if s, err := strconv.Atoi(strings.TrimSpace(fields[6])); err == nil && s > 0 {
-				ho.Slides = s
-			}
+		curve := strings.Split(strings.TrimSpace(fields[5]), "|")
+		if len(curve) == 0 || curve[0] == "" {
+			return RawHitObject{}, false
 		}
-		if len(fields) > 7 {
-			if l, err := strconv.ParseFloat(strings.TrimSpace(fields[7]), 64); err == nil {
-				ho.SliderLength = l
-			}
+		ho.CurveType = curve[0]
+		ho.CurvePointCount = len(curve) - 1
+
+		slides, err := strconv.Atoi(strings.TrimSpace(fields[6]))
+		if err != nil || slides <= 0 {
+			return RawHitObject{}, false
 		}
+		ho.Slides = slides
+
+		length, err := strconv.ParseFloat(strings.TrimSpace(fields[7]), 64)
+		if err != nil || length <= 0 {
+			return RawHitObject{}, false
+		}
+		ho.SliderLength = length
 	case typeBits&1 != 0: // circle: x,y,time,type,hitSound,hitSample
 		ho.Type = RawHitObjectCircle
 	default:

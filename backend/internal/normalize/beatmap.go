@@ -88,9 +88,11 @@ func parseDifficulty(d map[string]string, formatVersion int) (difficultySettings
 
 	ar := od
 	if raw, ok := d["ApproachRate"]; ok {
-		if parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64); err == nil {
-			ar = parsed
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+		if err != nil {
+			return difficultySettings{}, fmt.Errorf("invalid [Difficulty] field %q: %w", "ApproachRate", err)
 		}
+		ar = parsed
 	}
 
 	return difficultySettings{ar: ar, od: od, cs: cs, hp: hp}, nil
@@ -277,9 +279,9 @@ func dominantBPM(points []osufile.RawTimingPoint, hitObjects []domain.HitObject)
 	sort.Slice(uninherited, func(i, j int) bool { return uninherited[i].Offset < uninherited[j].Offset })
 
 	mapEnd := uninherited[len(uninherited)-1].Offset
-	if len(hitObjects) > 0 {
-		if lastEnd := float64(hitObjects[len(hitObjects)-1].EndTime / time.Millisecond); lastEnd > mapEnd {
-			mapEnd = lastEnd
+	for _, ho := range hitObjects {
+		if endMs := float64(ho.EndTime / time.Millisecond); endMs > mapEnd {
+			mapEnd = endMs
 		}
 	}
 

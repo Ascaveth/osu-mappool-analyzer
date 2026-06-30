@@ -35,6 +35,10 @@ type ConfigurationIssue struct {
 func ValidateConfiguration(t *Tournament) []ConfigurationIssue {
 	var issues []ConfigurationIssue
 
+	if t == nil {
+		return []ConfigurationIssue{{IsError: true, Message: "tournament configuration is nil"}}
+	}
+
 	for _, stage := range t.Stages {
 		seenCategoryOrders := map[int][]string{}
 		seenCategoryNames := map[string]int{}

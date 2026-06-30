@@ -33,16 +33,16 @@ func (r *BeatmapRepository) Save(_ context.Context, b *domain.Beatmap) (*domain.
 	defer r.mu.Unlock()
 
 	if existingID, ok := r.byHash[b.OsuFileHash]; ok {
-		return r.byID[existingID], nil
+		return cloneBeatmap(r.byID[existingID]), nil
 	}
 
-	stored := *b
+	stored := cloneBeatmap(b)
 	if stored.ID == "" {
 		stored.ID = uuid.NewString()
 	}
-	r.byID[stored.ID] = &stored
+	r.byID[stored.ID] = stored
 	r.byHash[stored.OsuFileHash] = stored.ID
-	return &stored, nil
+	return cloneBeatmap(stored), nil
 }
 
 func (r *BeatmapRepository) FindByID(_ context.Context, id string) (*domain.Beatmap, error) {
@@ -53,7 +53,7 @@ func (r *BeatmapRepository) FindByID(_ context.Context, id string) (*domain.Beat
 	if !ok {
 		return nil, storage.ErrBeatmapNotFound
 	}
-	return b, nil
+	return cloneBeatmap(b), nil
 }
 
 func (r *BeatmapRepository) FindByHash(_ context.Context, hash string) (*domain.Beatmap, error) {
@@ -64,7 +64,18 @@ func (r *BeatmapRepository) FindByHash(_ context.Context, hash string) (*domain.
 	if !ok {
 		return nil, storage.ErrBeatmapNotFound
 	}
-	return r.byID[id], nil
+	return cloneBeatmap(r.byID[id]), nil
+}
+
+// cloneBeatmap returns a deep copy of b, so callers holding the returned
+// pointer can never mutate the repository's internal record (or another
+// caller's previously-returned copy) through it.
+func cloneBeatmap(b *domain.Beatmap) *domain.Beatmap {
+	clone := *b
+	clone.Tags = append([]string(nil), b.Tags...)
+	clone.TimingPoints = append([]domain.TimingPoint(nil), b.TimingPoints...)
+	clone.HitObjects = append([]domain.HitObject(nil), b.HitObjects...)
+	return &clone
 }
 
 var _ storage.BeatmapRepository = (*BeatmapRepository)(nil)

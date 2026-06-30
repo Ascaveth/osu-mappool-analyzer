@@ -18,6 +18,10 @@ export interface Finding {
   description: string;
   reason: string;
   recommendation: string;
+  // ID of the Stage this finding is specifically about, when its own
+  // scope (e.g. tournament) is broader than one stage. Absent when the
+  // finding has no single target stage.
+  targetStageId?: string;
 }
 
 export interface Citation {

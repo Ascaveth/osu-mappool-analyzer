@@ -84,13 +84,20 @@ func (ProgressionAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 				Description:    fmt.Sprintf("average OD drops from %.2f (%q) to %.2f (%q)", sequence[i].avgOD, sequence[i].stage.Name, sequence[i+1].avgOD, sequence[i+1].stage.Name),
 				Reason:         "average Overall Difficulty decreasing between consecutive stages runs counter to the expectation that later stages test at least as demanding a pool as earlier ones",
 				Recommendation: fmt.Sprintf("review beatmap selection in %q relative to %q, or confirm the difficulty decrease is intentional for this tournament format", sequence[i+1].stage.Name, sequence[i].stage.Name),
+				TargetStageID:  sequence[i+1].stage.ID,
 			})
 		}
 	}
 	metrics["regression_count"] = float64(regressions)
 
 	if len(deltas) >= 3 {
-		med := median(deltas)
+		var positiveDeltas []float64
+		for _, d := range deltas {
+			if d > 0 {
+				positiveDeltas = append(positiveDeltas, d)
+			}
+		}
+		med := median(positiveDeltas) // median() returns 0 for an empty slice, which the d > 0 && med > 0 check below already treats as "no spike baseline"
 		for i, d := range deltas {
 			if d > 0 && med > 0 && d > spikeMultiplier*med {
 				findings = append(findings, domain.Finding{
@@ -98,6 +105,7 @@ func (ProgressionAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 					Description:    fmt.Sprintf("average OD increases by %.2f from %q to %q, more than %.0fx the tournament's typical stage-to-stage increase (%.2f)", d, sequence[i].stage.Name, sequence[i+1].stage.Name, spikeMultiplier, med),
 					Reason:         "a disproportionately large jump in average difficulty between consecutive stages may leave players underprepared relative to the rest of the tournament's pacing",
 					Recommendation: fmt.Sprintf("review whether the difficulty jump into %q is intentional, or smooth it with an intermediate stage or adjusted beatmap selection", sequence[i+1].stage.Name),
+					TargetStageID:  sequence[i+1].stage.ID,
 				})
 			}
 		}

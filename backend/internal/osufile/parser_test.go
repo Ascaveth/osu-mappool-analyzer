@@ -101,6 +101,44 @@ also,not,valid
 	}
 }
 
+func TestParse_SkipsSliderMissingRequiredFields(t *testing.T) {
+	input := `osu file format v14
+
+[HitObjects]
+100,100,1000,2,0,B|250:200
+200,200,2000,1,0,0:0:0:0:
+`
+	raw, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(raw.HitObjects) != 1 {
+		t.Fatalf("len(HitObjects) = %d, want 1 (malformed slider, missing slides/length, skipped)", len(raw.HitObjects))
+	}
+	if raw.HitObjects[0].Type != RawHitObjectCircle {
+		t.Errorf("HitObjects[0].Type = %v, want RawHitObjectCircle", raw.HitObjects[0].Type)
+	}
+}
+
+func TestParse_SkipsSpinnerMissingEndTime(t *testing.T) {
+	input := `osu file format v14
+
+[HitObjects]
+256,192,4000,8,0
+100,100,1000,1,0,0:0:0:0:
+`
+	raw, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(raw.HitObjects) != 1 {
+		t.Fatalf("len(HitObjects) = %d, want 1 (malformed spinner, missing endTime, skipped)", len(raw.HitObjects))
+	}
+	if raw.HitObjects[0].Type != RawHitObjectCircle {
+		t.Errorf("HitObjects[0].Type = %v, want RawHitObjectCircle", raw.HitObjects[0].Type)
+	}
+}
+
 func TestParse_BOMHeaderIsTolerated(t *testing.T) {
 	input := "\uFEFFosu file format v14\n\n[Metadata]\nTitle:BOM Test\n"
 	raw, err := Parse(strings.NewReader(input))

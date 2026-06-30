@@ -43,6 +43,14 @@ type Finding struct {
 	Reason         string
 	Recommendation string
 	Metrics        map[string]float64
+
+	// TargetStageID is the ID of the Stage this Finding is specifically
+	// about, when the Finding's own Scope is broader than one stage (e.g.
+	// a tournament-scope progression Finding describing a change between
+	// two stages). Empty when the Finding has no single stage to point
+	// to. Consumers should prefer this over parsing stage names out of
+	// Description/Recommendation text.
+	TargetStageID string
 }
 
 // Analysis is the structured, persisted result of running one analyzer
