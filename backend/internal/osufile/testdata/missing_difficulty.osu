@@ -1,0 +1,21 @@
+osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:Incomplete Song
+Artist:Test Artist
+Creator:Tester
+Version:Normal
+
+[Difficulty]
+CircleSize:4
+OverallDifficulty:8
+
+[TimingPoints]
+0,500,4,2,0,100,1,0
+
+[HitObjects]
+100,100,1000,1,0,0:0:0:0:

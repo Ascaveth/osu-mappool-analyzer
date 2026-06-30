@@ -1,0 +1,309 @@
+@import "tailwindcss";
+
+/* === Design tokens (docs/15-ui-specification.md "Programme" system) === */
+:root {
+  --paper: #e9ede1;
+  --paper-line: #c7d0b5;
+  --ink: #1b1f17;
+  --ink-soft: #5c6450;
+  --mark: #8c2f2f;
+  --brass: #b5742a;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-line: var(--paper-line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-mark: var(--mark);
+  --color-brass: var(--brass);
+  --font-display: var(--font-fraunces);
+  --font-body: var(--font-plex-sans);
+  --font-data: var(--font-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--brass);
+  color: var(--paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* === Programme layout === */
+
+.programme {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 8rem;
+}
+
+.masthead {
+  border-bottom: 1px solid var(--paper-line);
+  padding-bottom: 1.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.masthead-eyebrow {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.masthead-title {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin-top: 0.4rem;
+}
+
+.masthead-title em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.thesis {
+  margin-bottom: 3rem;
+}
+
+.thesis-text {
+  font-family: var(--font-display), serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.375rem, 2.6vw, 1.875rem);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  max-width: 46rem;
+}
+
+.stat-ledger {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+  font-family: var(--font-data), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--paper-line);
+  padding-top: 0.9rem;
+}
+
+.stat-ledger strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.stage {
+  margin-bottom: 3.5rem;
+}
+
+.stage-head {
+  display: grid;
+  grid-template-columns: 1fr minmax(200px, 240px);
+  gap: 1.5rem;
+  align-items: start;
+  border-top: 1px solid var(--ink);
+  padding-top: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.stage-head-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.stage-numeral {
+  font-family: var(--font-display), serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.375rem;
+  color: var(--brass);
+}
+
+.stage-name {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: 1.375rem;
+  letter-spacing: -0.005em;
+}
+
+.stage-meta {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.03em;
+  margin-top: 0.3rem;
+}
+
+.category-block {
+  display: grid;
+  grid-template-columns: 1fr minmax(200px, 240px);
+  gap: 1.5rem;
+  align-items: start;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--paper-line);
+}
+
+.category-name {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.4rem;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  gap: 0.85rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+}
+
+.slot-code {
+  font-family: var(--font-data), monospace;
+  font-size: 0.75rem;
+  color: var(--brass);
+  font-weight: 600;
+}
+
+.slot-title {
+  font-size: 0.9375rem;
+  line-height: 1.3;
+}
+
+.slot-artist {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.slot-stats {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.marginalia {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--paper-line);
+}
+
+.note {
+  display: flex;
+  gap: 0.5em;
+  align-items: flex-start;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.note-mark {
+  flex: none;
+  font-family: var(--font-data), monospace;
+  font-size: 0.75rem;
+  color: var(--mark);
+  line-height: 1.6;
+}
+
+.note-body {
+  min-width: 0;
+}
+
+.note-text {
+  font-family: var(--font-body), sans-serif;
+  color: var(--ink);
+  margin: 0;
+}
+
+.note-source {
+  display: block;
+  font-family: var(--font-data), monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 0.3rem;
+}
+
+.note-why {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+}
+
+.colophon {
+  margin-top: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--paper-line);
+  text-align: center;
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 720px) {
+  .stage-head,
+  .category-block {
+    grid-template-columns: 1fr;
+  }
+  .marginalia {
+    border-left: none;
+    border-top: 1px dashed var(--paper-line);
+    padding-left: 0;
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
+  }
+}
+
+/* === Page-load reveal: the engine "typing down" the page === */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
