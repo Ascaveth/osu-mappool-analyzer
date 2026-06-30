@@ -110,5 +110,3 @@ See the `docs/` directory for architecture, API, domain model, UI, and testing d
 ## License
 
 MIT
-
----
