@@ -66,6 +66,7 @@ func (BalanceAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis.R
 	return analysis.Result{Metrics: metrics, Findings: findings}, nil
 }
 
+// describeAxis converts an axis key to a human-readable label.
 func describeAxis(name string) string {
 	switch name {
 	case "ar":
@@ -79,6 +80,7 @@ func describeAxis(name string) string {
 	}
 }
 
+// rangeOf returns the minimum and maximum values in values.
 func rangeOf(values []float64) (min, max float64) {
 	min, max = values[0], values[0]
 	for _, v := range values {

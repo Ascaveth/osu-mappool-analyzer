@@ -26,7 +26,12 @@ type ConfigurationIssue struct {
 // "Supporting future/non-linear formats" section names same-Order stages
 // as the explicit mechanism for parallel/concurrent stages (e.g.
 // simultaneous group pools), to be treated as a peer set rather than an
-// error. That is a documented use case, not the absence of validation.
+// ValidateConfiguration checks a tournament for category configuration issues.
+// It reports hard errors for categories with no slots and for duplicate category
+// orders within a stage, and reports warnings when a category name is reused
+// within a stage.
+//
+// @returns A slice of configuration issues found while validating the tournament.
 func ValidateConfiguration(t *Tournament) []ConfigurationIssue {
 	var issues []ConfigurationIssue
 

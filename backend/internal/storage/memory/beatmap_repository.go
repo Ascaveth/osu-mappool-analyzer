@@ -20,7 +20,7 @@ type BeatmapRepository struct {
 	byHash map[string]string // OsuFileHash -> ID
 }
 
-// NewBeatmapRepository returns an empty in-memory repository.
+// NewBeatmapRepository returns an empty in-memory beatmap repository with initialized indexes.
 func NewBeatmapRepository() *BeatmapRepository {
 	return &BeatmapRepository{
 		byID:   map[string]*domain.Beatmap{},

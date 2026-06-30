@@ -16,7 +16,8 @@ import (
 // distance/angle measurements meaningless at that transition. X/Y is each
 // object's start position; slider end positions aren't modeled (see
 // domain.HitObject doc comment), so jump distance approximates start-to-start
-// movement rather than true cursor path length.
+// landingObjects returns the ordered hit objects used for jump calculations.
+// Spinners are excluded because they do not have a fixed landing position.
 func landingObjects(bm *domain.Beatmap) []domain.HitObject {
 	var out []domain.HitObject
 	for _, h := range orderedHitObjects(bm) {
@@ -27,6 +28,7 @@ func landingObjects(bm *domain.Beatmap) []domain.HitObject {
 	return out
 }
 
+// distance computes the straight-line distance between two hit objects' start positions.
 func distance(a, b domain.HitObject) float64 {
 	dx := float64(b.X - a.X)
 	dy := float64(b.Y - a.Y)
@@ -83,7 +85,8 @@ var _ analysis.Analyzer = JumpDistanceAnalyzer{}
 // b->a and b->c. Returns false (undefined) if either vector has zero
 // length, which happens when consecutive objects are stacked at the same
 // position — a common, valid pattern (e.g. within a stream) that simply
-// has no defined turning angle.
+// angleBetween returns the turning angle at b between the segments b→a and b→c.
+// It reports false when either segment has zero length.
 func angleBetween(a, b, c domain.HitObject) (float64, bool) {
 	v1x, v1y := float64(a.X-b.X), float64(a.Y-b.Y)
 	v2x, v2y := float64(c.X-b.X), float64(c.Y-b.Y)

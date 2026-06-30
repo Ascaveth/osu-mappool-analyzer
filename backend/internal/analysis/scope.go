@@ -6,7 +6,8 @@ import "github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 // found in the tournament. Beatmap scopes are deduplicated by ID — the
 // same Beatmap can fill multiple Slots (even across Stages), and it
 // should be analyzed once per tournament run, not once per Slot it
-// happens to occupy.
+// enumerateScopes returns the scopes of the requested type for a tournament.
+// For beatmap scopes, each beatmap ID is included at most once.
 func enumerateScopes(t *domain.Tournament, scopeType domain.ScopeType) []domain.Scope {
 	switch scopeType {
 	case domain.ScopeTournament:
@@ -51,7 +52,8 @@ func enumerateScopes(t *domain.Tournament, scopeType domain.ScopeType) []domain.
 
 // FindStage, FindCategory, and FindBeatmap are shared tree-lookup helpers
 // exported for use by analyzer implementations (e.g. internal/analysis/metadata)
-// so each analyzer package doesn't reimplement Tournament traversal.
+// FindStage locates a stage in a tournament by ID.
+// It returns the matching stage if found, or nil otherwise.
 func FindStage(t *domain.Tournament, id string) *domain.Stage {
 	for i := range t.Stages {
 		if t.Stages[i].ID == id {
@@ -61,6 +63,7 @@ func FindStage(t *domain.Tournament, id string) *domain.Stage {
 	return nil
 }
 
+// It returns the matching category from the tournament tree when found.
 func FindCategory(t *domain.Tournament, id string) *domain.Category {
 	for si := range t.Stages {
 		for ci := range t.Stages[si].Categories {
@@ -72,6 +75,7 @@ func FindCategory(t *domain.Tournament, id string) *domain.Category {
 	return nil
 }
 
+// It returns the first matching beatmap found in any stage, category, or slot.
 func FindBeatmap(t *domain.Tournament, id string) *domain.Beatmap {
 	for _, s := range t.Stages {
 		for _, c := range s.Categories {
