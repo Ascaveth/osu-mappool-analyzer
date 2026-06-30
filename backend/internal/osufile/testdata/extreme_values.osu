@@ -1,0 +1,31 @@
+osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 0
+
+[Metadata]
+Title:Extreme Test
+Artist:Test Artist
+Creator:Tester
+Version:Extreme
+
+[Difficulty]
+HPDrainRate:10
+CircleSize:3
+OverallDifficulty:10
+ApproachRate:10
+SliderMultiplier:3.6
+SliderTickRate:4
+
+[TimingPoints]
+0,100,4,2,0,100,1,0
+60000,90,4,2,0,100,1,0
+
+[HitObjects]
+100,100,0,1,0,0:0:0:0:
+110,110,100,1,0,0:0:0:0:
+120,120,200,1,0,0:0:0:0:
+130,130,300,1,0,0:0:0:0:
+140,140,400,1,0,0:0:0:0:
+256,192,120000,8,0,180000,0:0:0:0:
