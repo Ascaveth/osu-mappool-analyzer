@@ -12,8 +12,8 @@ export default function Home() {
   return (
     <main className="programme">
       <div className="masthead">
-        <p className="masthead-eyebrow">osu! Mappool Analyzer</p>
-        <h1 className="masthead-title">Analysis Engine</h1>
+        <h1 className="masthead-title">osu! Mappool Analyzer</h1>
+        <h2 className="masthead-eyebrow">Ngakak abis Boss</h2>
       </div>
 
       <p
@@ -27,13 +27,11 @@ export default function Home() {
           color: "var(--ink-soft)",
         }}
       >
-        Point it at a pool. It reads progression, balance, and diversity the
-        way a seasoned mappooler would — and writes down what it finds.
+        Why need to testplay if you can use an automated mappool analyzer?
       </p>
 
       <section className="exhibit reveal" style={{ animationDelay: "100ms" }}>
         <div className="exhibit-head">
-          <span className="stage-numeral">II</span>
           <h2 className="stage-name">Round of 16</h2>
         </div>
         <div className="exhibit-notes">
@@ -42,7 +40,7 @@ export default function Home() {
           ))}
         </div>
         <p className="exhibit-caption">
-          Fig. 1 — {ro16Findings.length} finding{ro16Findings.length === 1 ? "" : "s"} from a generated report, Spring Invitational 2026
+          {ro16Findings.length} finding{ro16Findings.length === 1 ? "" : "s"} from a generated analysis, Ascaveth Invitational Tournament 2023
         </p>
       </section>
 

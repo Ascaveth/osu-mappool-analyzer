@@ -160,8 +160,8 @@ export default function NewTournamentPage() {
     notes.push({
       key: "ready",
       kind: "ready",
-      text: "Structure checks out. Ready to typeset.",
-      source: "Proof",
+      text: "Everything looks good!",
+      source: "",
     });
   }
 
@@ -208,7 +208,7 @@ export default function NewTournamentPage() {
               className="field-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Spring Invitational"
+              placeholder="Ascaveth Invitational 2023"
             />
           </div>
 
@@ -220,9 +220,6 @@ export default function NewTournamentPage() {
             {stages.map((stage, si) => (
               <div key={stage._id} className="stage-builder-item">
                 <div className="stage-builder-header">
-                  <span className="stage-numeral" style={{ flex: "none" }}>
-                    {si + 1}
-                  </span>
                   <input
                     className="field-input"
                     value={stage.name}
@@ -345,47 +342,13 @@ export default function NewTournamentPage() {
           )}
         </div>
 
-        <aside className="proof-panel" aria-label="Live proof of the tournament programme">
+        <aside className="proof-panel" aria-label="Setup checks">
           <p className="proof-eyebrow">
-            <span>Proof</span>
-            <span>As it will print</span>
+            <span>Checks before you continue</span>
           </p>
-          <p className="proof-title">{name.trim() || "Untitled tournament"}</p>
-
-          {stages.length === 0 ? (
-            <p className="proof-empty">Add a stage to see it typeset here.</p>
+          {notes.length === 0 ? (
+            <p className="proof-empty">Add a stage to see checks here.</p>
           ) : (
-            stages.map((stage, si) => (
-              <div className="proof-stage" key={stage._id}>
-                <p className="proof-stage-name">
-                  <span className="proof-stage-numeral">{si + 1}</span>
-                  {stage.name.trim() || `Stage ${si + 1}`}
-                </p>
-                {stage.categories.map((cat) => (
-                  <div className="proof-category" key={cat._id}>
-                    <div className="proof-codes">
-                      {slotCodes(cat).map((code) => (
-                        <span
-                          key={code}
-                          className="proof-code"
-                          style={{ color: modAccentColor(code) ?? "var(--ink-soft)" }}
-                        >
-                          {code}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))
-          )}
-
-          <p className="proof-ledger">
-            {stages.length} stage{stages.length !== 1 ? "s" : ""} · {totalSlots} total slot
-            {totalSlots !== 1 ? "s" : ""}
-          </p>
-
-          {notes.length > 0 && (
             <div className="proof-notes">
               {notes.map((n) => (
                 <div className="note" key={n.key}>

@@ -20,6 +20,26 @@
   --mod-tb: var(--brass); /* Tiebreaker — reuses the decisive/accent gold */
 }
 
+.dark {
+  --paper: #1b1d17;
+  --paper-line: #3a3f30;
+  --ink: #e9ede1;
+  --ink-soft: #a3ab92;
+  --mark: #d9776a;
+  --brass: #d69a52;
+  --confirm: #6cbd85;
+
+  --mod-nm: #8fa8c4;
+  --mod-hd: #d9c06a;
+  --mod-hr: #cf7565;
+  --mod-dt: #9784bf;
+  --mod-fm: #96bf82;
+  --mod-tb: var(--brass);
+}
+
+/* Tailwind v4 class-based dark variant, driven by next-themes' `.dark` class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-paper: var(--paper);
   --color-paper-line: var(--paper-line);
@@ -31,6 +51,29 @@
   --font-display: var(--font-fraunces);
   --font-body: var(--font-plex-sans);
   --font-data: var(--font-plex-mono);
+
+  /* shadcn/ui semantic tokens, mapped onto the Programme palette so
+     shadcn-based components (e.g. components/ui/theme.tsx) render in the
+     same voice instead of introducing a second color language. */
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--paper);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--paper);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--brass);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--paper-line);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--paper-line);
+  --color-muted-foreground: var(--ink-soft);
+  --color-accent: var(--paper-line);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--mark);
+  --color-destructive-foreground: var(--paper);
+  --color-border: var(--paper-line);
+  --color-input: var(--paper-line);
+  --color-ring: var(--brass);
 }
 
 * {
@@ -46,6 +89,14 @@ body {
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-switcher {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.5rem;
+  z-index: 50;
 }
 
 ::selection {
@@ -145,14 +196,6 @@ body {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
-}
-
-.stage-numeral {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 1.375rem;
-  color: var(--brass);
 }
 
 .stage-name {
@@ -641,73 +684,11 @@ body {
   align-items: baseline;
 }
 
-.proof-title {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 1.125rem;
-  margin: 0.2rem 0 1.1rem;
-}
-
 .proof-empty {
   font-family: var(--font-body), sans-serif;
   font-size: 0.8125rem;
   color: var(--ink-soft);
   line-height: 1.5;
-}
-
-.proof-stage {
-  padding-top: 0.7rem;
-  margin-top: 0.7rem;
-  border-top: 1px dashed var(--paper-line);
-}
-
-.proof-stage:first-child {
-  padding-top: 0;
-  margin-top: 0;
-  border-top: none;
-}
-
-.proof-stage-name {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-family: var(--font-display), serif;
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.proof-stage-numeral {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-weight: 500;
-  color: var(--brass);
-}
-
-.proof-category {
-  margin-top: 0.45rem;
-}
-
-.proof-codes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.1rem 0.55rem;
-  line-height: 1.6;
-}
-
-.proof-code {
-  font-family: var(--font-data), monospace;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.proof-ledger {
-  margin-top: 1.1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--paper-line);
-  font-family: var(--font-data), monospace;
-  font-size: 0.75rem;
-  color: var(--ink-soft);
 }
 
 .proof-notes {
@@ -760,4 +741,90 @@ body {
   font-size: 0.6875rem;
   letter-spacing: 0.05em;
   color: var(--ink-soft);
+}
+
+/* === Site footer: the programme's colophon page === */
+
+.site-footer {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 2.5rem;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 2rem;
+  border-top: 1px solid var(--ink);
+  padding-top: 1.75rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.footer-brand {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  margin-bottom: 0.5rem;
+}
+
+.footer-tagline {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 26rem;
+}
+
+.footer-heading {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.75rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.footer-links a {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.875rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  width: fit-content;
+}
+
+.footer-links a:hover {
+  border-bottom-color: var(--brass);
+  color: var(--brass);
+}
+
+.footer-meta-line {
+  font-family: var(--font-data), monospace;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.footer-fineprint {
+  margin-top: 1.5rem;
+  font-family: var(--font-data), monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 720px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }

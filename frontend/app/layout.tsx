@@ -1,18 +1,15 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600"],
-});
+import { ThemeProvider } from "next-themes";
+import ThemeSwitch from "@/components/ui/theme-switch";
+import { Footer } from "@/components/Footer";
+import { SITE_TAGLINE } from "@/lib/site-metadata";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -21,9 +18,17 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  axes: ["opsz", "SOFT", "WONK"],
+});
+
 export const metadata: Metadata = {
-  title: "Spring Invitational 2026 — Mappool Report",
-  description: "Analysis Engine report for the Spring Invitational 2026 mappool.",
+  title: "osu! Mappool Analyzer",
+  description: SITE_TAGLINE,
 };
 
 /**
@@ -40,9 +45,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${fraunces.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <div className="theme-switcher">
+            <ThemeSwitch />
+          </div>
+          {children}
+          <Footer />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
