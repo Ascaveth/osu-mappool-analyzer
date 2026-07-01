@@ -32,7 +32,8 @@ export function Masthead({ tournament, report }: { tournament: Tournament; repor
     <header className="masthead reveal">
       <p className="masthead-eyebrow">Mappool Analysis · Tournament Report</p>
       <h1 className="masthead-title">
-        {tournament.name} <em>{tournament.edition}</em>
+        {tournament.name}{" "}
+        {tournament.edition && <em>{tournament.edition}</em>}
       </h1>
       <p className="stage-meta" style={{ marginTop: "0.6rem" }}>
         Generated {formatDate(report.generatedAt)} · {tournament.stages.length} stages ·{" "}
