@@ -18,6 +18,8 @@
   --mod-dt: #6b5590; /* Double Time — muted plum */
   --mod-fm: #7a9a68; /* Free Mod — muted sage green */
   --mod-tb: var(--brass); /* Tiebreaker — reuses the decisive/accent gold */
+
+  color-scheme: light;
 }
 
 .dark {
@@ -35,6 +37,8 @@
   --mod-dt: #9784bf;
   --mod-fm: #96bf82;
   --mod-tb: var(--brass);
+
+  color-scheme: dark;
 }
 
 /* Tailwind v4 class-based dark variant, driven by next-themes' `.dark` class. */
@@ -484,6 +488,10 @@ body {
   background-position: right 0.6rem center;
   padding-right: 1.75rem;
   cursor: pointer;
+}
+
+.dark .field-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a3ab92'/%3E%3C/svg%3E");
 }
 
 /* === Stage / category builder === */
