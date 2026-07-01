@@ -90,15 +90,9 @@ export default function PoolPage({
     }
   };
 
-  const runAnalysis = async () => {
+  const runAnalysis = () => {
     setRunning(true);
-    try {
-      await api.getReport(id);
-      router.push(`/tournaments/${id}/report`);
-    } catch (e) {
-      console.error(e);
-      setRunning(false);
-    }
+    router.push(`/tournaments/${id}/report`);
   };
 
   if (error && !tournament) {
