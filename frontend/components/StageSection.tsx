@@ -71,20 +71,21 @@ export function StageSection({
               </p>
               {category.slots.map((slot) => {
                 const notes = slot.beatmap ? beatmapNotes[slot.beatmap.id] ?? [] : [];
+                const hasCover = !!slot.beatmap?.coverUrl;
                 return (
                   <div
                     className="slot-row"
                     key={slot.id}
                     style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
                   >
-                    <span className="slot-code">{slot.code}</span>
-                    <span>
-                      <span className="slot-title">
-                        {slot.beatmap ? formatBeatmapLabel(slot.beatmap) : "— unfilled —"}
-                      </span>
+                    <span className={`slot-code${hasCover ? " slot-chip" : ""}`}>
+                      {slot.code}
+                    </span>
+                    <span className={`slot-title${hasCover ? " slot-chip" : ""}`}>
+                      {slot.beatmap ? formatBeatmapLabel(slot.beatmap) : "— unfilled —"}
                     </span>
                     {slot.beatmap && (
-                      <span className="slot-stats">
+                      <span className={`slot-stats${hasCover ? " slot-chip" : ""}`}>
                         AR {slot.beatmap.ar.toFixed(1)} · OD {slot.beatmap.od.toFixed(1)} ·{" "}
                         {slot.beatmap.bpm} BPM
                       </span>

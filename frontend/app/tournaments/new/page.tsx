@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { CreateStageInput, CreateCategoryInput } from "@/lib/api";
+import { modAccentColor } from "@/lib/beatmap-format";
 
 interface CatDraft {
   _id: string;
@@ -15,6 +16,13 @@ interface StageDraft {
   _id: string;
   name: string;
   categories: CatDraft[];
+}
+
+interface ProofNote {
+  key: string;
+  kind: "warn" | "ready";
+  text: string;
+  source: string;
 }
 
 const MOD_OPTIONS: { value: string; label: string }[] = [
@@ -44,6 +52,10 @@ function newStage(): StageDraft {
 
 function hasDuplicateMods(categories: CatDraft[]): boolean {
   return new Set(categories.map((c) => c.modPrefix)).size !== categories.length;
+}
+
+function slotCodes(cat: CatDraft): string[] {
+  return Array.from({ length: cat.slotCount }, (_, i) => `${cat.modPrefix}${i + 1}`);
 }
 
 export default function NewTournamentPage() {
@@ -116,6 +128,43 @@ export default function NewTournamentPage() {
         !hasDuplicateMods(s.categories),
     );
 
+  const notes: ProofNote[] = [];
+  if (!name.trim()) {
+    notes.push({
+      key: "name",
+      kind: "warn",
+      text: "The tournament needs a name before it can run.",
+      source: "Title",
+    });
+  }
+  stages.forEach((s, si) => {
+    const label = s.name.trim() || `Stage ${si + 1}`;
+    if (!s.name.trim()) {
+      notes.push({
+        key: `${s._id}-name`,
+        kind: "warn",
+        text: `Stage ${si + 1} needs a name.`,
+        source: label,
+      });
+    }
+    if (hasDuplicateMods(s.categories)) {
+      notes.push({
+        key: `${s._id}-dup`,
+        kind: "warn",
+        text: "Two categories share a mod — give each a distinct one.",
+        source: label,
+      });
+    }
+  });
+  if (valid) {
+    notes.push({
+      key: "ready",
+      kind: "ready",
+      text: "Structure checks out. Ready to typeset.",
+      source: "Proof",
+    });
+  }
+
   const handleSubmit = async () => {
     if (!valid || submitting) return;
     setSubmitting(true);
@@ -148,153 +197,215 @@ export default function NewTournamentPage() {
         <h1 className="masthead-title">Define your pool structure</h1>
       </div>
 
-      <div className="field">
-        <label className="field-label" htmlFor="t-name">
-          Tournament Name
-        </label>
-        <input
-          id="t-name"
-          className="field-input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Spring Invitational"
-        />
-      </div>
-
-      <div style={{ marginTop: "2rem" }}>
-        <p className="category-name" style={{ marginBottom: "1rem" }}>
-          Stages
-        </p>
-
-        {stages.map((stage, si) => (
-          <div key={stage._id} className="stage-builder-item">
-            <div className="stage-builder-header">
-              <span className="stage-numeral" style={{ flex: "none" }}>
-                {si + 1}
-              </span>
-              <input
-                className="field-input"
-                value={stage.name}
-                onChange={(e) => updateStage(stage._id, { name: e.target.value })}
-                placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
-                style={{ flex: 1 }}
-              />
-              {stages.length > 1 && (
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => removeStage(stage._id)}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-
-            <div className="cat-list">
-              <p className="category-name" style={{ marginBottom: "0.4rem" }}>
-                Categories
-              </p>
-              {stage.categories.map((cat) => {
-                const isDupMod =
-                  stage.categories.filter((c) => c.modPrefix === cat.modPrefix)
-                    .length > 1;
-                const isTB = cat.modPrefix === "TB";
-                return (
-                  <div key={cat._id} className="cat-builder-row">
-                    <select
-                      className="field-select"
-                      aria-label="Mod category"
-                      value={cat.modPrefix}
-                      onChange={(e) => onModChange(stage._id, cat._id, e.target.value)}
-                      style={{
-                        flex: 2,
-                        minWidth: 0,
-                        borderColor: isDupMod ? "var(--mark)" : undefined,
-                      }}
-                    >
-                      {MOD_OPTIONS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
-                      <input
-                        className="field-input"
-                        type="number"
-                        aria-label="Number of slots"
-                        min={1}
-                        max={20}
-                        value={cat.slotCount}
-                        disabled={isTB}
-                        onChange={(e) =>
-                          updateCat(stage._id, cat._id, {
-                            slotCount: isTB
-                              ? 1
-                              : Math.min(
-                                  20,
-                                  Math.max(1, parseInt(e.target.value) || 1),
-                                ),
-                          })
-                        }
-                        style={{ width: "3.5rem" }}
-                        title={isTB ? "Tiebreaker is locked to 1 slot" : "Number of slots"}
-                      />
-                      <span className="slot-stats">slots</span>
-                    </div>
-                    {stage.categories.length > 1 && (
-                      <button
-                        className="btn btn-ghost"
-                        aria-label="Remove category"
-                        style={{ flex: "none", padding: "0.25rem 0.5rem" }}
-                        onClick={() => removeCat(stage._id, cat._id)}
-                        title="Remove category"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {hasDuplicateMods(stage.categories) && (
-                <p
-                  style={{
-                    color: "var(--mark)",
-                    fontFamily: "var(--font-data)",
-                    fontSize: "0.75rem",
-                    marginTop: "0.35rem",
-                  }}
-                >
-                  ▲ Each category in a stage must use a distinct mod.
-                </p>
-              )}
-              <button
-                className="btn btn-ghost"
-                style={{ marginTop: "0.4rem", fontSize: "0.6875rem" }}
-                onClick={() => addCat(stage._id)}
-              >
-                + Add Category
-              </button>
-            </div>
+      <div className="setup-layout">
+        <div>
+          <div className="field">
+            <label className="field-label" htmlFor="t-name">
+              Tournament Name
+            </label>
+            <input
+              id="t-name"
+              className="field-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Spring Invitational"
+            />
           </div>
-        ))}
 
-        <button className="btn btn-ghost" onClick={addStage} style={{ marginTop: "0.5rem" }}>
-          + Add Stage
-        </button>
+          <div style={{ marginTop: "2rem" }}>
+            <p className="category-name" style={{ marginBottom: "1rem" }}>
+              Stages
+            </p>
+
+            {stages.map((stage, si) => (
+              <div key={stage._id} className="stage-builder-item">
+                <div className="stage-builder-header">
+                  <span className="stage-numeral" style={{ flex: "none" }}>
+                    {si + 1}
+                  </span>
+                  <input
+                    className="field-input"
+                    value={stage.name}
+                    onChange={(e) => updateStage(stage._id, { name: e.target.value })}
+                    placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
+                    style={{ flex: 1 }}
+                  />
+                  {stages.length > 1 && (
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => removeStage(stage._id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <div className="cat-list">
+                  <p className="category-name" style={{ marginBottom: "0.4rem" }}>
+                    Categories
+                  </p>
+                  {stage.categories.map((cat) => {
+                    const isDupMod =
+                      stage.categories.filter((c) => c.modPrefix === cat.modPrefix)
+                        .length > 1;
+                    const isTB = cat.modPrefix === "TB";
+                    const dotColor = modAccentColor(`${cat.modPrefix}1`);
+                    return (
+                      <div key={cat._id} className="cat-builder-row">
+                        <div className="mod-select-wrap">
+                          {dotColor && (
+                            <span
+                              className="category-dot"
+                              style={{ background: dotColor }}
+                            />
+                          )}
+                          <select
+                            className="field-select"
+                            aria-label="Mod category"
+                            value={cat.modPrefix}
+                            onChange={(e) =>
+                              onModChange(stage._id, cat._id, e.target.value)
+                            }
+                            style={{
+                              borderColor: isDupMod ? "var(--mark)" : undefined,
+                            }}
+                          >
+                            {MOD_OPTIONS.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
+                          <input
+                            className="field-input"
+                            type="number"
+                            aria-label="Number of slots"
+                            min={1}
+                            max={20}
+                            value={cat.slotCount}
+                            disabled={isTB}
+                            onChange={(e) =>
+                              updateCat(stage._id, cat._id, {
+                                slotCount: isTB
+                                  ? 1
+                                  : Math.min(
+                                      20,
+                                      Math.max(1, parseInt(e.target.value) || 1),
+                                    ),
+                              })
+                            }
+                            style={{ width: "3.5rem" }}
+                            title={isTB ? "Tiebreaker is locked to 1 slot" : "Number of slots"}
+                          />
+                          <span className="slot-stats">slots</span>
+                        </div>
+                        {stage.categories.length > 1 && (
+                          <button
+                            className="btn btn-ghost"
+                            aria-label="Remove category"
+                            style={{ flex: "none", padding: "0.25rem 0.5rem" }}
+                            onClick={() => removeCat(stage._id, cat._id)}
+                            title="Remove category"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ marginTop: "0.4rem", fontSize: "0.6875rem" }}
+                    onClick={() => addCat(stage._id)}
+                  >
+                    + Add Category
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button className="btn btn-ghost" onClick={addStage} style={{ marginTop: "0.5rem" }}>
+              + Add Stage
+            </button>
+          </div>
+
+          {error && (
+            <p
+              style={{
+                color: "var(--mark)",
+                marginTop: "1rem",
+                fontFamily: "var(--font-data)",
+                fontSize: "0.8125rem",
+              }}
+            >
+              {error}
+            </p>
+          )}
+        </div>
+
+        <aside className="proof-panel" aria-label="Live proof of the tournament programme">
+          <p className="proof-eyebrow">
+            <span>Proof</span>
+            <span>As it will print</span>
+          </p>
+          <p className="proof-title">{name.trim() || "Untitled tournament"}</p>
+
+          {stages.length === 0 ? (
+            <p className="proof-empty">Add a stage to see it typeset here.</p>
+          ) : (
+            stages.map((stage, si) => (
+              <div className="proof-stage" key={stage._id}>
+                <p className="proof-stage-name">
+                  <span className="proof-stage-numeral">{si + 1}</span>
+                  {stage.name.trim() || `Stage ${si + 1}`}
+                </p>
+                {stage.categories.map((cat) => (
+                  <div className="proof-category" key={cat._id}>
+                    <div className="proof-codes">
+                      {slotCodes(cat).map((code) => (
+                        <span
+                          key={code}
+                          className="proof-code"
+                          style={{ color: modAccentColor(code) ?? "var(--ink-soft)" }}
+                        >
+                          {code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+
+          <p className="proof-ledger">
+            {stages.length} stage{stages.length !== 1 ? "s" : ""} · {totalSlots} total slot
+            {totalSlots !== 1 ? "s" : ""}
+          </p>
+
+          {notes.length > 0 && (
+            <div className="proof-notes">
+              {notes.map((n) => (
+                <div className="note" key={n.key}>
+                  <span
+                    className="note-mark"
+                    aria-hidden="true"
+                    style={n.kind === "ready" ? { color: "var(--confirm)" } : undefined}
+                  >
+                    {n.kind === "ready" ? "✓" : "▲"}
+                  </span>
+                  <div className="note-body">
+                    <p className="note-text">{n.text}</p>
+                    <span className="note-source">{n.source}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
       </div>
-
-      {error && (
-        <p
-          style={{
-            color: "var(--mark)",
-            marginTop: "1rem",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.8125rem",
-          }}
-        >
-          {error}
-        </p>
-      )}
 
       <div className="wizard-nav">
         <span className="wizard-step-indicator">

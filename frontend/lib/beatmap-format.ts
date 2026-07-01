@@ -29,10 +29,11 @@ export function modAccentColor(code: string): string | undefined {
 }
 
 // Renders a beatmap slot's row background: a left accent border in the
-// mod's color, and (when a cover is available) a gradient from a
-// mod-tinted paper tone on the left, where the code/title text sits, to
-// the cover image on the right. The right edge never drops below ~45%
-// tint — fully revealing the cover there would wash out the stats text.
+// mod's color, and (when a cover is available) the cover photo itself
+// under a light ink veil — enough to keep every cover feeling like part
+// of the same printed programme, not so much that the photo disappears.
+// Text legibility over the photo is handled separately by `.slot-chip`
+// (see globals.css), not by darkening the row.
 export function slotAccentStyle(
   code: string,
   coverUrl: string | undefined,
@@ -51,7 +52,7 @@ export function slotAccentStyle(
 
   return {
     ...style,
-    backgroundImage: `linear-gradient(to right, ${base} 0%, ${base} 30%, color-mix(in srgb, ${base} 45%, transparent) 100%), url(${coverUrl})`,
+    backgroundImage: `linear-gradient(to right, color-mix(in srgb, var(--ink) 18%, transparent) 0%, color-mix(in srgb, var(--ink) 8%, transparent) 100%), url(${coverUrl})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
   };
