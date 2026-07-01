@@ -1,0 +1,152 @@
+"use client";
+
+import { use, useState, useEffect } from "react";
+import Link from "next/link";
+import { createMockClient } from "@/lib/api";
+import { Masthead } from "@/components/Masthead";
+import { ThesisHero } from "@/components/ThesisHero";
+import { StageSection } from "@/components/StageSection";
+import { MarginNote } from "@/components/MarginNote";
+import type { Tournament, Report, Citation } from "@/lib/types";
+
+const api = createMockClient();
+
+export default function ReportPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.getTournament(id), api.getReport(id)])
+      .then(([t, r]) => {
+        setTournament(t);
+        setReport(r);
+      })
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Failed to load report"),
+      );
+  }, [id]);
+
+  if (error) {
+    return (
+      <main className="programme">
+        <p
+          style={{
+            color: "var(--mark)",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.875rem",
+          }}
+        >
+          Error: {error}
+        </p>
+        <Link
+          href="/"
+          style={{
+            display: "inline-block",
+            marginTop: "1rem",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            color: "var(--ink-soft)",
+          }}
+        >
+          ← Home
+        </Link>
+      </main>
+    );
+  }
+
+  if (!tournament || !report) {
+    return (
+      <main className="programme">
+        <p className="slot-stats">Generating report…</p>
+      </main>
+    );
+  }
+
+  const { findings } = report.sections;
+
+  const stageNotes = (stageId: string): Citation[] =>
+    findings.filter(
+      (c) =>
+        (c.scope.type === "stage" && c.scope.id === stageId) ||
+        (c.scope.type === "tournament" && c.finding.targetStageId === stageId),
+    );
+
+  const categoryNotesFor = (stage: (typeof tournament.stages)[number]) =>
+    Object.fromEntries(
+      stage.categories.map((cat) => [
+        cat.id,
+        findings.filter(
+          (c) => c.scope.type === "category" && c.scope.id === cat.id,
+        ),
+      ]),
+    );
+
+  const beatmapNotesFor = (stage: (typeof tournament.stages)[number]) =>
+    Object.fromEntries(
+      stage.categories
+        .flatMap((cat) => cat.slots)
+        .filter((s) => s.beatmap !== null)
+        .map((s) => [
+          s.beatmap!.id,
+          findings.filter(
+            (c) => c.scope.type === "beatmap" && c.scope.id === s.beatmap!.id,
+          ),
+        ]),
+    );
+
+  const tournamentWideNotes = findings.filter(
+    (c) => c.scope.type === "tournament" && !c.finding.targetStageId,
+  );
+
+  return (
+    <main className="programme">
+      <div style={{ marginBottom: "1.5rem" }}>
+        <Link
+          href={`/tournaments/${id}/pool`}
+          style={{
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--ink-soft)",
+            textDecoration: "none",
+          }}
+        >
+          ← Pool Builder
+        </Link>
+      </div>
+
+      <Masthead tournament={tournament} report={report} />
+      <ThesisHero sections={report.sections} />
+
+      {tournamentWideNotes.length > 0 && (
+        <div className="marginalia">
+          {tournamentWideNotes.map((c, i) => (
+            <MarginNote key={i} citation={c} />
+          ))}
+        </div>
+      )}
+
+      {tournament.stages.map((stage, i) => (
+        <StageSection
+          key={stage.id}
+          stage={stage}
+          stageNotes={stageNotes(stage.id)}
+          categoryNotes={categoryNotesFor(stage)}
+          beatmapNotes={beatmapNotesFor(stage)}
+          delay={160 + i * 90}
+        />
+      ))}
+
+      <p className="colophon">
+        ⁂ End of report · {tournament.name} {tournament.edition}
+      </p>
+    </main>
+  );
+}
