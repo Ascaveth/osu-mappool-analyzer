@@ -4,6 +4,9 @@
 // same way `normalize.Beatmap` translates `.osu` file syntax into
 // `domain.Beatmap` on the backend. No field here exists that the backend
 // doesn't already produce; this file does not invent new data shape.
+// Exception: `Beatmap.coverUrl` is client-derived from the public osu!
+// CDN by beatmapset ID and is never sourced from the backend — it's a
+// pure presentation value, not part of the domain model.
 
 export type ScopeType = "tournament" | "stage" | "category" | "beatmap";
 export type Severity = "info" | "warning" | "critical";
@@ -53,6 +56,7 @@ export interface Beatmap {
   ar: number;
   od: number;
   bpm: number;
+  coverUrl?: string;
 }
 
 export interface Slot {

@@ -66,6 +66,15 @@ function parseOsu(text: string): Omit<Beatmap, "id"> {
     }
   }
 
+  // BeatmapSetID lives in the .osu file itself, so it's available
+  // regardless of which URL form the user pasted (unlike a URL regex,
+  // which only catches the beatmapsets/{setId}#{mode}/{diffId} form).
+  const beatmapsetId = num("BeatmapSetID");
+  const coverUrl =
+    beatmapsetId > 0
+      ? `https://assets.ppy.sh/beatmaps/${beatmapsetId}/covers/cover.jpg`
+      : undefined;
+
   return {
     title: get("Title") || "Unknown Title",
     artist: get("Artist") || "Unknown Artist",
@@ -74,6 +83,7 @@ function parseOsu(text: string): Omit<Beatmap, "id"> {
     ar: num("ApproachRate"),
     od: num("OverallDifficulty"),
     bpm,
+    coverUrl,
   };
 }
 
