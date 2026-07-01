@@ -169,13 +169,17 @@ export function createMockClient(): ApiClient {
 
     async assignBeatmap(slotId: string, beatmapId: string): Promise<Slot> {
       const s = load();
-      s.slotAssignments[slotId] = beatmapId;
-      save(s);
+      const beatmap = s.beatmaps[beatmapId];
+      if (!beatmap) throw new Error(`Beatmap "${beatmapId}" not found`);
       for (const t of Object.values(s.tournaments)) {
         for (const stage of t.stages) {
           for (const cat of stage.categories) {
             const slot = cat.slots.find((sl) => sl.id === slotId);
-            if (slot) return { ...slot, beatmap: s.beatmaps[beatmapId] ?? null };
+            if (slot) {
+              s.slotAssignments[slotId] = beatmapId;
+              save(s);
+              return { ...slot, beatmap };
+            }
           }
         }
       }

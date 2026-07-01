@@ -3,10 +3,8 @@
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createMockClient } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Tournament, Beatmap } from "@/lib/types";
-
-const api = createMockClient();
 
 export default function PoolPage({
   params,
@@ -21,14 +19,20 @@ export default function PoolPage({
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, bms] = await Promise.all([
-      api.getTournament(id),
-      api.listBeatmaps(),
-    ]);
-    setTournament(t);
-    setBeatmaps(bms);
+    try {
+      const [t, bms] = await Promise.all([
+        api.getTournament(id),
+        api.listBeatmaps(),
+      ]);
+      setTournament(t);
+      setBeatmaps(bms);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load pool");
+    }
   }, [id]);
 
   useEffect(() => {
@@ -54,15 +58,24 @@ export default function PoolPage({
 
   const assign = async (beatmapId: string) => {
     if (!selectedSlotId) return;
-    await api.assignBeatmap(selectedSlotId, beatmapId);
-    setSelectedSlotId(null);
-    await refresh();
+    try {
+      await api.assignBeatmap(selectedSlotId, beatmapId);
+      setSelectedSlotId(null);
+      await refresh();
+    } catch (e) {
+      setSelectedSlotId(null);
+      setError(e instanceof Error ? e.message : "Failed to assign beatmap");
+    }
   };
 
   const clear = async (slotId: string) => {
-    await api.clearBeatmap(slotId);
-    if (selectedSlotId === slotId) setSelectedSlotId(null);
-    await refresh();
+    try {
+      await api.clearBeatmap(slotId);
+      if (selectedSlotId === slotId) setSelectedSlotId(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to clear slot");
+    }
   };
 
   const runAnalysis = async () => {
@@ -75,6 +88,34 @@ export default function PoolPage({
       setRunning(false);
     }
   };
+
+  if (error && !tournament) {
+    return (
+      <main className="programme">
+        <p
+          style={{
+            color: "var(--mark)",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.875rem",
+          }}
+        >
+          Error: {error}
+        </p>
+        <Link
+          href={`/tournaments/${id}/import`}
+          style={{
+            display: "inline-block",
+            marginTop: "1rem",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            color: "var(--ink-soft)",
+          }}
+        >
+          ← Back
+        </Link>
+      </main>
+    );
+  }
 
   if (!tournament) {
     return (
@@ -95,10 +136,24 @@ export default function PoolPage({
             ← Back
           </Link>
           {" · "}Step 3 of 3{" · "}
-          {tournament.name} {tournament.edition}
+          {tournament.name}
+          {tournament.edition ? ` ${tournament.edition}` : ""}
         </p>
         <h1 className="masthead-title">Pool Builder</h1>
       </div>
+
+      {error && (
+        <p
+          style={{
+            color: "var(--mark)",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.8125rem",
+            marginBottom: "1rem",
+          }}
+        >
+          ▲ {error}
+        </p>
+      )}
 
       <div className="pool-editor">
         {/* Left: slot grid */}
@@ -128,12 +183,22 @@ export default function PoolPage({
                   {cat.slots.map((slot) => (
                     <div
                       key={slot.id}
+                      role="button"
+                      tabIndex={0}
                       className={`slot-row pool-slot${selectedSlotId === slot.id ? " pool-slot--selected" : ""}`}
                       onClick={() =>
                         setSelectedSlotId(
                           slot.id === selectedSlotId ? null : slot.id,
                         )
                       }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedSlotId(
+                            slot.id === selectedSlotId ? null : slot.id,
+                          );
+                        }
+                      }}
                     >
                       <span className="slot-code">{slot.code}</span>
 
@@ -206,8 +271,16 @@ export default function PoolPage({
             filteredBeatmaps.map((bm) => (
               <div
                 key={bm.id}
+                role={selectedSlotId ? "button" : undefined}
+                tabIndex={selectedSlotId ? 0 : undefined}
                 className={`bm-card${selectedSlotId ? " bm-card--clickable" : ""}`}
                 onClick={() => selectedSlotId && assign(bm.id)}
+                onKeyDown={(e) => {
+                  if (selectedSlotId && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    assign(bm.id);
+                  }
+                }}
               >
                 <p className="bm-card-title">{bm.title}</p>
                 <p className="bm-card-meta">

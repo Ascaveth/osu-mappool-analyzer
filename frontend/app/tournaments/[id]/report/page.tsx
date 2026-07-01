@@ -2,14 +2,12 @@
 
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
-import { createMockClient } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Masthead } from "@/components/Masthead";
 import { ThesisHero } from "@/components/ThesisHero";
 import { StageSection } from "@/components/StageSection";
 import { MarginNote } from "@/components/MarginNote";
 import type { Tournament, Report, Citation } from "@/lib/types";
-
-const api = createMockClient();
 
 export default function ReportPage({
   params,
@@ -22,14 +20,26 @@ export default function ReportPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.getTournament(id), api.getReport(id)])
-      .then(([t, r]) => {
+    let cancelled = false;
+    (async () => {
+      const [t, r] = await Promise.all([api.getTournament(id), api.getReport(id)]);
+      return { t, r };
+    })()
+      .then(({ t, r }) => {
+        if (cancelled) return;
         setTournament(t);
         setReport(r);
+        setError(null);
       })
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Failed to load report"),
-      );
+      .catch((e) => {
+        if (cancelled) return;
+        setTournament(null);
+        setReport(null);
+        setError(e instanceof Error ? e.message : "Failed to load report");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (error) {
@@ -145,7 +155,8 @@ export default function ReportPage({
       ))}
 
       <p className="colophon">
-        ⁂ End of report · {tournament.name} {tournament.edition}
+        ⁂ End of report · {tournament.name}
+        {tournament.edition ? ` ${tournament.edition}` : ""}
       </p>
     </main>
   );

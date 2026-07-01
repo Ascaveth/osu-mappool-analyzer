@@ -3,10 +3,8 @@
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createMockClient } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Beatmap, Tournament } from "@/lib/types";
-
-const api = createMockClient();
 
 export default function ImportPage({
   params,
@@ -21,10 +19,18 @@ export default function ImportPage({
   const [urlInput, setUrlInput] = useState("");
   const [importing, setImporting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getTournament(id).then(setTournament).catch(console.error);
-    api.listBeatmaps().then(setBeatmaps).catch(console.error);
+    Promise.all([api.getTournament(id), api.listBeatmaps()])
+      .then(([t, bms]) => {
+        setTournament(t);
+        setBeatmaps(bms);
+        setLoadError(null);
+      })
+      .catch((e) =>
+        setLoadError(e instanceof Error ? e.message : "Failed to load tournament"),
+      );
   }, [id]);
 
   const importUrls = useCallback(async (raw: string) => {
@@ -64,6 +70,34 @@ export default function ImportPage({
         0,
       )
     : 0;
+
+  if (loadError) {
+    return (
+      <main className="programme">
+        <p
+          style={{
+            color: "var(--mark)",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.875rem",
+          }}
+        >
+          Error: {loadError}
+        </p>
+        <Link
+          href="/tournaments/new"
+          style={{
+            display: "inline-block",
+            marginTop: "1rem",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            color: "var(--ink-soft)",
+          }}
+        >
+          ← Back
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="programme">

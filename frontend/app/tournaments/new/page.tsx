@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMockClient } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { CreateStageInput, CreateCategoryInput } from "@/lib/api";
 
 interface CatDraft {
@@ -41,8 +41,6 @@ function newCat(): CatDraft {
 function newStage(): StageDraft {
   return { _id: draftId(), name: "", categories: [newCat()] };
 }
-
-const api = createMockClient();
 
 export default function NewTournamentPage() {
   const router = useRouter();
@@ -105,7 +103,9 @@ export default function NewTournamentPage() {
       (s) =>
         s.name.trim().length > 0 &&
         s.categories.length > 0 &&
-        s.categories.every((c) => c.slotCount >= 1),
+        s.categories.every((c) => c.slotCount >= 1 && c.slotCount <= 20) &&
+        new Set(s.categories.map((c) => c.modPrefix)).size ===
+          s.categories.length,
     );
 
   const handleSubmit = async () => {
@@ -185,49 +185,79 @@ export default function NewTournamentPage() {
               <p className="category-name" style={{ marginBottom: "0.4rem" }}>
                 Categories
               </p>
-              {stage.categories.map((cat) => (
-                <div key={cat._id} className="cat-builder-row">
-                  <select
-                    className="field-select"
-                    value={cat.modPrefix}
-                    onChange={(e) => onModChange(stage._id, cat._id, e.target.value)}
-                    style={{ flex: 2, minWidth: 0 }}
-                  >
-                    {MOD_OPTIONS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
-                    <input
-                      className="field-input"
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={cat.slotCount}
-                      onChange={(e) =>
-                        updateCat(stage._id, cat._id, {
-                          slotCount: Math.max(1, parseInt(e.target.value) || 1),
-                        })
-                      }
-                      style={{ width: "3.5rem" }}
-                      title="Number of slots"
-                    />
-                    <span className="slot-stats">slots</span>
-                  </div>
-                  {stage.categories.length > 1 && (
-                    <button
-                      className="btn btn-ghost"
-                      style={{ flex: "none", padding: "0.25rem 0.5rem" }}
-                      onClick={() => removeCat(stage._id, cat._id)}
-                      title="Remove category"
+              {stage.categories.map((cat) => {
+                const isDupMod =
+                  stage.categories.filter((c) => c.modPrefix === cat.modPrefix)
+                    .length > 1;
+                return (
+                  <div key={cat._id} className="cat-builder-row">
+                    <select
+                      className="field-select"
+                      aria-label="Mod category"
+                      value={cat.modPrefix}
+                      onChange={(e) => onModChange(stage._id, cat._id, e.target.value)}
+                      style={{
+                        flex: 2,
+                        minWidth: 0,
+                        borderColor: isDupMod ? "var(--mark)" : undefined,
+                      }}
                     >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
+                      {MOD_OPTIONS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
+                      <input
+                        className="field-input"
+                        type="number"
+                        aria-label="Number of slots"
+                        min={1}
+                        max={20}
+                        value={cat.slotCount}
+                        onChange={(e) =>
+                          updateCat(stage._id, cat._id, {
+                            slotCount: Math.min(
+                              20,
+                              Math.max(1, parseInt(e.target.value) || 1),
+                            ),
+                          })
+                        }
+                        style={{ width: "3.5rem" }}
+                        title="Number of slots"
+                      />
+                      <span className="slot-stats">slots</span>
+                    </div>
+                    {stage.categories.length > 1 && (
+                      <button
+                        className="btn btn-ghost"
+                        aria-label="Remove category"
+                        style={{ flex: "none", padding: "0.25rem 0.5rem" }}
+                        onClick={() => removeCat(stage._id, cat._id)}
+                        title="Remove category"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {stage.categories.some(
+                (c, i, arr) =>
+                  arr.findIndex((o) => o.modPrefix === c.modPrefix) !== i,
+              ) && (
+                <p
+                  style={{
+                    color: "var(--mark)",
+                    fontFamily: "var(--font-data)",
+                    fontSize: "0.75rem",
+                    marginTop: "0.35rem",
+                  }}
+                >
+                  ▲ Each category in a stage must use a distinct mod.
+                </p>
+              )}
               <button
                 className="btn btn-ghost"
                 style={{ marginTop: "0.4rem", fontSize: "0.6875rem" }}

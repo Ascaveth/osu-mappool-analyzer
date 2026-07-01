@@ -10,9 +10,11 @@ export async function GET(req: NextRequest) {
   try {
     res = await fetch(`https://osu.ppy.sh/osu/${id}`, {
       headers: { "User-Agent": "osu-mappool-analyzer/1.0" },
+      signal: AbortSignal.timeout(10_000),
     });
   } catch (e) {
-    return new NextResponse(`Failed to reach osu!: ${e}`, { status: 502 });
+    const msg = e instanceof Error && e.name === "TimeoutError" ? "timed out" : `${e}`;
+    return new NextResponse(`Failed to reach osu!: ${msg}`, { status: 502 });
   }
 
   if (!res.ok) {
