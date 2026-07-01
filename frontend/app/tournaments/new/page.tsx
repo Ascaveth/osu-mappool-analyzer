@@ -194,7 +194,7 @@ export default function NewTournamentPage() {
     <main className="programme">
       <div className="masthead">
         <p className="masthead-eyebrow">Step 1 of 2 · Tournament Setup</p>
-        <h1 className="masthead-title">Define your pool structure</h1>
+        <h1 className="masthead-title">Tournament Setup</h1>
       </div>
 
       <div className="setup-layout">
