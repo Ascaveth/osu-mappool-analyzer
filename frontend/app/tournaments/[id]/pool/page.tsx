@@ -198,28 +198,40 @@ export default function PoolPage({
                   )}
                   {cat.name}
                 </p>
-                {cat.slots.map((slot) => (
+                {cat.slots.map((slot) => {
+                  const hasCover = !!slot.beatmap?.coverUrl;
+                  return (
                   <div key={slot.id}>
                     <div className="slot-line">
                       <div
-                        className="slot-row"
+                        className="slot-row slot-row--editable"
                         style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
                       >
-                        <span className="slot-code">{slot.code}</span>
+                        <span className={`slot-code${hasCover ? " slot-chip" : ""}`}>
+                          {slot.code}
+                        </span>
 
                         {slot.beatmap ? (
                           <>
-                            <span className="slot-title">
+                            <span className={`slot-title${hasCover ? " slot-chip" : ""}`}>
                               {formatBeatmapLabel(slot.beatmap)}
                             </span>
-                            <span className="slot-stats">
+                            <span className={`slot-stats${hasCover ? " slot-chip" : ""}`}>
                               AR {slot.beatmap.ar.toFixed(1)} · OD{" "}
                               {slot.beatmap.od.toFixed(1)} ·{" "}
                               {slot.beatmap.bpm} BPM
                             </span>
+                            <button
+                              className="btn btn-ghost pool-slot-clear"
+                              onClick={() => clear(slot.id)}
+                              title="Clear slot"
+                              aria-label={`Clear beatmap from slot ${slot.code}`}
+                            >
+                              ×
+                            </button>
                           </>
                         ) : (
-                          <div className="slot-input-row">
+                          <>
                             <input
                               className="field-input slot-input"
                               placeholder="paste beatmap URL or ID"
@@ -248,25 +260,16 @@ export default function PoolPage({
                             >
                               {slotImporting[slot.id] ? "…" : "✓"}
                             </button>
-                          </div>
+                          </>
                         )}
                       </div>
-                      {slot.beatmap && (
-                        <button
-                          className="btn btn-ghost pool-slot-clear"
-                          onClick={() => clear(slot.id)}
-                          title="Clear slot"
-                          aria-label={`Clear beatmap from slot ${slot.code}`}
-                        >
-                          ×
-                        </button>
-                      )}
                     </div>
                     {slotErrors[slot.id] && (
                       <p className="slot-error">▲ {slotErrors[slot.id]}</p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
           </section>
