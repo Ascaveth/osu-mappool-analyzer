@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SITE_TAGLINE } from "@/lib/site-metadata";
 
 /**
  * Sitewide footer, styled as the colophon page of a printed programme.
@@ -9,9 +10,7 @@ export function Footer() {
       <div className="footer-grid">
         <div>
           <p className="footer-brand">osu! Mappool Analyzer</p>
-          <p className="footer-tagline">
-            Reads a mappool the way a seasoned mappooler would, and writes down what it finds.
-          </p>
+          <p className="footer-tagline">{SITE_TAGLINE}</p>
         </div>
 
         <div>

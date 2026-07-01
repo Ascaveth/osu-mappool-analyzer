@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import ThemeSwitch from "@/components/ui/theme-switch";
 import { Footer } from "@/components/Footer";
+import { SITE_TAGLINE } from "@/lib/site-metadata";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
@@ -27,7 +28,7 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "osu! Mappool Analyzer",
-  description: "Reads a mappool the way a seasoned mappooler would, and writes down what it finds.",
+  description: SITE_TAGLINE,
 };
 
 /**
