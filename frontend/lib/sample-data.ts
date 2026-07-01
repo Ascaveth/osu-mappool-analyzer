@@ -178,22 +178,22 @@ export const report: Report = {
       "Difficulty cools off right when Round of 16 should be raising the stakes — its average Overall Difficulty drops below Qualifiers, and three quarters of its slots lean on the same Normal Mod category. Grand Finals recovers the climb but reuses “Last Light” across two categories, and its Hard Rock pair gives players no approach-rate range to read.",
     findings: [
       {
-        analyzerName: "composition-analyzer",
+        analyzerName: "balance-analyzer",
         scope: { type: "stage", id: "stage-ro16" },
         finding: {
           severity: "warning",
-          description: "one category holds 75% of this stage's total slots",
-          reason: "a stage where one category supplies most of the slots tests a narrower range of mod conditions than its category count suggests",
+          description: "Free Mod maps is more favoured into Hidden rather than Hard Rock.",
+          reason: "Looking at the maps, FM1 and FM2 is Hidden favoured meanwhile only FM3 is Hard Rock favoured",
           recommendation: "rebalance slot counts across categories, or reconsider whether this stage needs that many categories",
         },
       },
       {
-        analyzerName: "progression-analyzer",
+        analyzerName: "length",
         scope: { type: "tournament", id: tournament.id },
         finding: {
           severity: "warning",
-          description: "average OD drops from 8.04 (“Qualifiers”) to 7.02 (“Round of 16”)",
-          reason: "average Overall Difficulty decreasing between consecutive stages runs counter to the expectation that later stages test at least as demanding a pool as earlier ones",
+          description: "Average drain time for the whole pool is more than 5 minutes.",
+          reason: "Average drain time for the whole pool this stage is too long, might reduce the drain time into average 2:30",
           recommendation: "review beatmap selection in “Round of 16” relative to “Qualifiers”, or confirm the difficulty decrease is intentional for this tournament format",
           targetStageId: "stage-ro16",
         },

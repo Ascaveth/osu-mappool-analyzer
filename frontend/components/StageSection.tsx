@@ -2,8 +2,6 @@ import type { Stage, Citation } from "@/lib/types";
 import { MarginNote } from "./MarginNote";
 import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
 
-const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
-
 /**
  * Renders a stage section with its categories, slots, and margin notes.
  *
@@ -33,7 +31,6 @@ export function StageSection({
       <div className="stage-head">
         <div>
           <div className="stage-head-title">
-            <span className="stage-numeral">{ROMAN[stage.order - 1] ?? stage.order}</span>
             <h2 className="stage-name">{stage.name}</h2>
           </div>
           <p className="stage-meta">

@@ -26,8 +26,8 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Spring Invitational 2026 — Mappool Report",
-  description: "Analysis Engine report for the Spring Invitational 2026 mappool.",
+  title: "osu! Mappool Analyzer",
+  description: "Reads a mappool the way a seasoned mappooler would, and writes down what it finds.",
 };
 
 /**
