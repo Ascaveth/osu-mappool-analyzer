@@ -1,5 +1,6 @@
 import type { Stage, Citation } from "@/lib/types";
 import { MarginNote } from "./MarginNote";
+import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
@@ -51,22 +52,36 @@ export function StageSection({
       {stage.categories.map((category) => {
         const notes = categoryNotes[category.id] ?? [];
         return (
-          <div className="category-block" key={category.id}>
+          <div
+            className="category-block"
+            key={category.id}
+            style={notes.length === 0 ? { gridTemplateColumns: "1fr" } : undefined}
+          >
             <div>
-              <p className="category-name">{category.name}</p>
+              <p className="category-name">
+                {modAccentColor(category.slots[0]?.code ?? "") && (
+                  <span
+                    className="category-dot"
+                    style={{
+                      background: modAccentColor(category.slots[0]?.code ?? ""),
+                    }}
+                  />
+                )}
+                {category.name}
+              </p>
               {category.slots.map((slot) => {
                 const notes = slot.beatmap ? beatmapNotes[slot.beatmap.id] ?? [] : [];
                 return (
-                  <div className="slot-row" key={slot.id}>
+                  <div
+                    className="slot-row"
+                    key={slot.id}
+                    style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
+                  >
                     <span className="slot-code">{slot.code}</span>
                     <span>
-                      <span className="slot-title">{slot.beatmap?.title ?? "— unfilled —"}</span>
-                      {slot.beatmap && (
-                        <>
-                          {" "}
-                          <span className="slot-artist">— {slot.beatmap.artist}</span>
-                        </>
-                      )}
+                      <span className="slot-title">
+                        {slot.beatmap ? formatBeatmapLabel(slot.beatmap) : "— unfilled —"}
+                      </span>
                     </span>
                     {slot.beatmap && (
                       <span className="slot-stats">

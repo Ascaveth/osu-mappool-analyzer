@@ -134,7 +134,7 @@ export default function NewTournamentPage() {
         })),
       };
       const t = await api.createTournament(input);
-      router.push(`/tournaments/${t.id}/import`);
+      router.push(`/tournaments/${t.id}/pool`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
       setSubmitting(false);
@@ -144,7 +144,7 @@ export default function NewTournamentPage() {
   return (
     <main className="programme">
       <div className="masthead">
-        <p className="masthead-eyebrow">Step 1 of 3 · Tournament Setup</p>
+        <p className="masthead-eyebrow">Step 1 of 2 · Tournament Setup</p>
         <h1 className="masthead-title">Define your pool structure</h1>
       </div>
 
@@ -305,7 +305,7 @@ export default function NewTournamentPage() {
           onClick={handleSubmit}
           disabled={!valid || submitting}
         >
-          {submitting ? "Creating…" : "Continue to Import →"}
+          {submitting ? "Creating…" : "Continue to Pool →"}
         </button>
       </div>
     </main>

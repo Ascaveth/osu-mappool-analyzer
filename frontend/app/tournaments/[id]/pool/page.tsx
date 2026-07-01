@@ -4,7 +4,8 @@ import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { Tournament, Beatmap } from "@/lib/types";
+import type { Tournament } from "@/lib/types";
+import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
 
 export default function PoolPage({
   params,
@@ -15,20 +16,17 @@ export default function PoolPage({
   const router = useRouter();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [beatmaps, setBeatmaps] = useState<Beatmap[]>([]);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [slotInputs, setSlotInputs] = useState<Record<string, string>>({});
+  const [slotImporting, setSlotImporting] = useState<Record<string, boolean>>({});
+  const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
+
   const refresh = useCallback(async () => {
     try {
-      const [t, bms] = await Promise.all([
-        api.getTournament(id),
-        api.listBeatmaps(),
-      ]);
+      const t = await api.getTournament(id);
       setTournament(t);
-      setBeatmaps(bms);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load pool");
@@ -45,33 +43,47 @@ export default function PoolPage({
   const filledCount = allSlots.filter((sl) => sl.beatmap !== null).length;
   const totalCount = allSlots.length;
 
-  const filteredBeatmaps = beatmaps.filter((bm) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      bm.title.toLowerCase().includes(q) ||
-      bm.artist.toLowerCase().includes(q) ||
-      bm.mapper.toLowerCase().includes(q) ||
-      bm.version.toLowerCase().includes(q)
-    );
-  });
-
-  const assign = async (beatmapId: string) => {
-    if (!selectedSlotId) return;
+  const importAndAssign = async (slotId: string) => {
+    const url = (slotInputs[slotId] ?? "").trim();
+    if (!url) return;
+    setSlotImporting((prev) => ({ ...prev, [slotId]: true }));
+    setSlotErrors((prev) => {
+      const next = { ...prev };
+      delete next[slotId];
+      return next;
+    });
     try {
-      await api.assignBeatmap(selectedSlotId, beatmapId);
-      setSelectedSlotId(null);
+      const bm = await api.importBeatmapFromUrl(url);
+      await api.assignBeatmap(slotId, bm.id);
+      setSlotInputs((prev) => {
+        const next = { ...prev };
+        delete next[slotId];
+        return next;
+      });
       await refresh();
     } catch (e) {
-      setSelectedSlotId(null);
-      setError(e instanceof Error ? e.message : "Failed to assign beatmap");
+      setSlotErrors((prev) => ({
+        ...prev,
+        [slotId]: e instanceof Error ? e.message : "Import failed",
+      }));
+    } finally {
+      setSlotImporting((prev) => ({ ...prev, [slotId]: false }));
     }
   };
 
   const clear = async (slotId: string) => {
     try {
       await api.clearBeatmap(slotId);
-      if (selectedSlotId === slotId) setSelectedSlotId(null);
+      setSlotInputs((prev) => {
+        const next = { ...prev };
+        delete next[slotId];
+        return next;
+      });
+      setSlotErrors((prev) => {
+        const next = { ...prev };
+        delete next[slotId];
+        return next;
+      });
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to clear slot");
@@ -102,7 +114,7 @@ export default function PoolPage({
           Error: {error}
         </p>
         <Link
-          href={`/tournaments/${id}/import`}
+          href="/tournaments/new"
           style={{
             display: "inline-block",
             marginTop: "1rem",
@@ -130,12 +142,12 @@ export default function PoolPage({
       <div className="masthead">
         <p className="masthead-eyebrow">
           <Link
-            href={`/tournaments/${id}/import`}
+            href="/tournaments/new"
             style={{ color: "inherit", textDecoration: "none" }}
           >
             ← Back
           </Link>
-          {" · "}Step 3 of 3{" · "}
+          {" · "}Step 2 of 2{" · "}
           {tournament.name}
           {tournament.edition ? ` ${tournament.edition}` : ""}
         </p>
@@ -155,150 +167,115 @@ export default function PoolPage({
         </p>
       )}
 
-      <div className="pool-editor">
-        {/* Left: slot grid */}
-        <div>
-          {tournament.stages.map((stage) => (
-            <section key={stage.id} style={{ marginBottom: "2.5rem" }}>
+      <div>
+        {tournament.stages.map((stage) => (
+          <section key={stage.id} style={{ marginBottom: "2.5rem" }}>
+            <div
+              style={{
+                borderTop: "1px solid var(--ink)",
+                paddingTop: "0.75rem",
+                marginBottom: "0.5rem",
+              }}
+            >
+              <h2 className="stage-name">{stage.name}</h2>
+            </div>
+
+            {stage.categories.map((cat) => (
               <div
+                key={cat.id}
                 style={{
-                  borderTop: "1px solid var(--ink)",
-                  paddingTop: "0.75rem",
-                  marginBottom: "0.5rem",
+                  borderTop: "1px solid var(--paper-line)",
+                  paddingTop: "0.5rem",
+                  paddingBottom: "0.5rem",
                 }}
               >
-                <h2 className="stage-name">{stage.name}</h2>
-              </div>
+                <p className="category-name">
+                  {modAccentColor(cat.slots[0]?.code ?? "") && (
+                    <span
+                      className="category-dot"
+                      style={{ background: modAccentColor(cat.slots[0]?.code ?? "") }}
+                    />
+                  )}
+                  {cat.name}
+                </p>
+                {cat.slots.map((slot) => (
+                  <div key={slot.id}>
+                    <div className="slot-line">
+                      <div
+                        className="slot-row"
+                        style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
+                      >
+                        <span className="slot-code">{slot.code}</span>
 
-              {stage.categories.map((cat) => (
-                <div
-                  key={cat.id}
-                  style={{
-                    borderTop: "1px solid var(--paper-line)",
-                    paddingTop: "0.5rem",
-                    paddingBottom: "0.5rem",
-                  }}
-                >
-                  <p className="category-name">{cat.name}</p>
-                  {cat.slots.map((slot) => (
-                    <div
-                      key={slot.id}
-                      role="button"
-                      tabIndex={0}
-                      className={`slot-row pool-slot${selectedSlotId === slot.id ? " pool-slot--selected" : ""}`}
-                      onClick={() =>
-                        setSelectedSlotId(
-                          slot.id === selectedSlotId ? null : slot.id,
-                        )
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedSlotId(
-                            slot.id === selectedSlotId ? null : slot.id,
-                          );
-                        }
-                      }}
-                    >
-                      <span className="slot-code">{slot.code}</span>
-
-                      {slot.beatmap ? (
-                        <>
-                          <span>
+                        {slot.beatmap ? (
+                          <>
                             <span className="slot-title">
-                              {slot.beatmap.title}
-                            </span>{" "}
-                            <span className="slot-artist">
-                              — {slot.beatmap.artist}
+                              {formatBeatmapLabel(slot.beatmap)}
                             </span>
-                          </span>
-                          <span className="slot-stats">
-                            AR {slot.beatmap.ar.toFixed(1)} · OD{" "}
-                            {slot.beatmap.od.toFixed(1)} · {slot.beatmap.bpm}{" "}
-                            BPM
-                          </span>
-                          <button
-                            className="btn btn-ghost pool-slot-clear"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              clear(slot.id);
-                            }}
-                            title="Clear slot"
-                          >
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <span className="pool-slot-empty">
-                          {selectedSlotId === slot.id
-                            ? "← pick a beatmap from the library"
-                            : "click to select"}
-                        </span>
+                            <span className="slot-stats">
+                              AR {slot.beatmap.ar.toFixed(1)} · OD{" "}
+                              {slot.beatmap.od.toFixed(1)} ·{" "}
+                              {slot.beatmap.bpm} BPM
+                            </span>
+                          </>
+                        ) : (
+                          <div className="slot-input-row">
+                            <input
+                              className="field-input slot-input"
+                              placeholder="paste beatmap URL or ID"
+                              aria-label={`Beatmap URL or ID for slot ${slot.code}`}
+                              value={slotInputs[slot.id] ?? ""}
+                              onChange={(e) =>
+                                setSlotInputs((prev) => ({
+                                  ...prev,
+                                  [slot.id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") importAndAssign(slot.id);
+                              }}
+                              disabled={!!slotImporting[slot.id]}
+                            />
+                            <button
+                              className="btn btn-ghost pool-slot-confirm"
+                              onClick={() => importAndAssign(slot.id)}
+                              disabled={
+                                !!slotImporting[slot.id] ||
+                                !(slotInputs[slot.id] ?? "").trim()
+                              }
+                              title="Import & assign"
+                              aria-label={`Import and assign beatmap to slot ${slot.code}`}
+                            >
+                              {slotImporting[slot.id] ? "…" : "✓"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {slot.beatmap && (
+                        <button
+                          className="btn btn-ghost pool-slot-clear"
+                          onClick={() => clear(slot.id)}
+                          title="Clear slot"
+                          aria-label={`Clear beatmap from slot ${slot.code}`}
+                        >
+                          ×
+                        </button>
                       )}
                     </div>
-                  ))}
-                </div>
-              ))}
-            </section>
-          ))}
-        </div>
-
-        {/* Right: beatmap library */}
-        <aside className="pool-library">
-          <p className="category-name" style={{ marginBottom: "0.5rem" }}>
-            Beatmap Library
-          </p>
-          <input
-            className="field-input"
-            placeholder="Search title, artist, mapper…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ marginBottom: "0.75rem" }}
-          />
-          {beatmaps.length === 0 ? (
-            <p className="slot-stats" style={{ marginTop: "0.5rem" }}>
-              No beatmaps imported yet.{" "}
-              <Link
-                href={`/tournaments/${id}/import`}
-                style={{ color: "var(--brass)" }}
-              >
-                Go back to Import.
-              </Link>
-            </p>
-          ) : filteredBeatmaps.length === 0 ? (
-            <p className="slot-stats">No matches.</p>
-          ) : (
-            filteredBeatmaps.map((bm) => (
-              <div
-                key={bm.id}
-                role={selectedSlotId ? "button" : undefined}
-                tabIndex={selectedSlotId ? 0 : undefined}
-                className={`bm-card${selectedSlotId ? " bm-card--clickable" : ""}`}
-                onClick={() => selectedSlotId && assign(bm.id)}
-                onKeyDown={(e) => {
-                  if (selectedSlotId && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    assign(bm.id);
-                  }
-                }}
-              >
-                <p className="bm-card-title">{bm.title}</p>
-                <p className="bm-card-meta">
-                  {bm.version} · {bm.mapper}
-                </p>
-                <p className="bm-card-meta">
-                  AR {bm.ar.toFixed(1)} · OD {bm.od.toFixed(1)} · {bm.bpm} BPM
-                </p>
+                    {slotErrors[slot.id] && (
+                      <p className="slot-error">▲ {slotErrors[slot.id]}</p>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))
-          )}
-        </aside>
+            ))}
+          </section>
+        ))}
       </div>
 
       <div className="wizard-nav">
         <span className="wizard-step-indicator">
           {filledCount} / {totalCount} slots filled
-          {selectedSlotId ? " · slot selected — click a beatmap to assign" : ""}
         </span>
         <button
           className="btn btn-primary"
