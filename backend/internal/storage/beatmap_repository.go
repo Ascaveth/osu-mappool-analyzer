@@ -39,4 +39,18 @@ type BeatmapRepository interface {
 	// FindByHash returns the beatmap with the given OsuFileHash, or
 	// ErrBeatmapNotFound. Used to detect re-imports of the same file.
 	FindByHash(ctx context.Context, hash string) (*domain.Beatmap, error)
+
+	// List returns beatmaps matching opts, in the given sort order.
+	List(ctx context.Context, opts BeatmapListOptions) ([]domain.Beatmap, error)
+}
+
+// BeatmapListOptions filters and sorts BeatmapRepository.List. SortBy is one
+// of "title", "bpm", "length_seconds"; SortDescending reverses it.
+type BeatmapListOptions struct {
+	// Query is a case-insensitive substring match against Title or Artist.
+	Query          string
+	Mapper         string
+	BPMMin, BPMMax *float64
+	SortBy         string
+	SortDescending bool
 }
