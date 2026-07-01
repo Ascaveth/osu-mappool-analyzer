@@ -52,7 +52,7 @@ export default function PoolPage({
     )
     .map((sl) => sl.id);
 
-  const importAndAssign = async (slotId: string) => {
+  const importAndAssign = async (slotId: string, opts?: { skipRefresh?: boolean }) => {
     const url = (slotInputs[slotId] ?? "").trim();
     if (!url) return;
     setSlotImporting((prev) => ({ ...prev, [slotId]: true }));
@@ -69,7 +69,7 @@ export default function PoolPage({
         delete next[slotId];
         return next;
       });
-      await refresh();
+      if (!opts?.skipRefresh) await refresh();
     } catch (e) {
       setSlotErrors((prev) => ({
         ...prev,
@@ -99,12 +99,22 @@ export default function PoolPage({
     }
   };
 
+  const APPLY_ALL_CONCURRENCY = 3;
+
   const applyAll = async () => {
     if (pendingSlotIds.length === 0) return;
     setApplyingAll(true);
+    const queue = [...pendingSlotIds];
+    const worker = async () => {
+      let slotId: string | undefined;
+      while ((slotId = queue.shift()) !== undefined) {
+        await importAndAssign(slotId, { skipRefresh: true });
+      }
+    };
     await Promise.allSettled(
-      pendingSlotIds.map((slotId) => importAndAssign(slotId))
+      Array.from({ length: Math.min(APPLY_ALL_CONCURRENCY, queue.length) }, worker)
     );
+    await refresh();
     setApplyingAll(false);
   };
 
