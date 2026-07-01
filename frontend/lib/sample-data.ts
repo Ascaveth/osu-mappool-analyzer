@@ -183,7 +183,7 @@ export const report: Report = {
         finding: {
           severity: "warning",
           description: "Free Mod maps is more favoured into Hidden rather than Hard Rock.",
-          reason: "Looking at the maps, FM1 and FM2 is Hidden favoured meanwhile only FM3 is Hard Rock favoured",
+          reason: "Looking at the maps, FM1 and FM2 are Hidden favoured meanwhile only FM3 is Hard Rock favoured",
           recommendation: "rebalance slot counts across categories, or reconsider whether this stage needs that many categories",
         },
       },
@@ -193,7 +193,7 @@ export const report: Report = {
         finding: {
           severity: "warning",
           description: "Average drain time for the whole pool is more than 5 minutes.",
-          reason: "Average drain time for the whole pool this stage is too long, might reduce the drain time into average 2:30",
+          reason: "Average drain time for the whole pool is too long, might reduce the drain time into average 2:30",
           recommendation: "review beatmap selection in “Round of 16” relative to “Qualifiers”, or confirm the difficulty decrease is intentional for this tournament format",
           targetStageId: "stage-ro16",
         },
