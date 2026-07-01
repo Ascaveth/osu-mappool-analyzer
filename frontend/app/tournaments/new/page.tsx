@@ -391,6 +391,7 @@ export default function NewTournamentPage() {
                 <div className="note" key={n.key}>
                   <span
                     className="note-mark"
+                    aria-hidden="true"
                     style={n.kind === "ready" ? { color: "var(--confirm)" } : undefined}
                   >
                     {n.kind === "ready" ? "✓" : "▲"}

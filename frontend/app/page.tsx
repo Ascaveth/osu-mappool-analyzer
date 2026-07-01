@@ -37,12 +37,12 @@ export default function Home() {
           <h2 className="stage-name">Round of 16</h2>
         </div>
         <div className="exhibit-notes">
-          {ro16Findings.map((c, i) => (
-            <MarginNote key={i} citation={c} />
+          {ro16Findings.map((c) => (
+            <MarginNote key={`${c.analyzerName}-${c.scope.type}-${c.scope.id}`} citation={c} />
           ))}
         </div>
         <p className="exhibit-caption">
-          Fig. 1 — two findings from a generated report, Spring Invitational 2026
+          Fig. 1 — {ro16Findings.length} finding{ro16Findings.length === 1 ? "" : "s"} from a generated report, Spring Invitational 2026
         </p>
       </section>
 
