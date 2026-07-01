@@ -11,10 +11,6 @@ const MOD_LABELS: Record<string, string> = {
   DT: "Double Time",
   FM: "Free Mod",
   TB: "Tiebreaker",
-  EX: "EX",
-  RC: "Rice",
-  LN: "Long Note",
-  CN: "Coordination",
 };
 
 interface Store {
