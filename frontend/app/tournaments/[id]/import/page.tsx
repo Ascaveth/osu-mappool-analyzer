@@ -20,18 +20,29 @@ export default function ImportPage({
   const [importing, setImporting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [beatmapsLoadError, setBeatmapsLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    Promise.all([api.getTournament(id), api.listBeatmaps()])
-      .then(([t, bms]) => {
+    api
+      .getTournament(id)
+      .then((t) => {
         setTournament(t);
-        setBeatmaps(bms);
         setLoadError(null);
       })
       .catch((e) =>
         setLoadError(e instanceof Error ? e.message : "Failed to load tournament"),
       );
-  }, [id]);
+    api
+      .listBeatmaps()
+      .then((bms) => {
+        setBeatmaps(bms);
+        setBeatmapsLoadError(null);
+      })
+      .catch((e) =>
+        setBeatmapsLoadError(e instanceof Error ? e.message : "Failed to load beatmaps"),
+      );
+  }, [id, retryKey]);
 
   const importUrls = useCallback(async (raw: string) => {
     const urls = raw
@@ -83,18 +94,26 @@ export default function ImportPage({
         >
           Error: {loadError}
         </p>
-        <Link
-          href="/tournaments/new"
-          style={{
-            display: "inline-block",
-            marginTop: "1rem",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.6875rem",
-            color: "var(--ink-soft)",
-          }}
-        >
-          ← Back
-        </Link>
+        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setRetryKey((k) => k + 1)}
+          >
+            Retry
+          </button>
+          <Link
+            href="/tournaments/new"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              fontFamily: "var(--font-data)",
+              fontSize: "0.6875rem",
+              color: "var(--ink-soft)",
+            }}
+          >
+            ← Back
+          </Link>
+        </div>
       </main>
     );
   }
@@ -146,6 +165,26 @@ export default function ImportPage({
           {importing ? "Importing…" : "Add"}
         </button>
       </div>
+
+      {beatmapsLoadError && (
+        <p
+          style={{
+            color: "var(--mark)",
+            fontFamily: "var(--font-data)",
+            fontSize: "0.75rem",
+            marginTop: "0.75rem",
+          }}
+        >
+          ▲ Failed to load existing beatmaps: {beatmapsLoadError}{" "}
+          <button
+            className="btn btn-ghost"
+            style={{ marginLeft: "0.5rem", padding: "0.1rem 0.4rem" }}
+            onClick={() => setRetryKey((k) => k + 1)}
+          >
+            Retry
+          </button>
+        </p>
+      )}
 
       {errors.length > 0 && (
         <div style={{ marginTop: "0.75rem" }}>

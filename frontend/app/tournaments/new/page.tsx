@@ -42,6 +42,10 @@ function newStage(): StageDraft {
   return { _id: draftId(), name: "", categories: [newCat()] };
 }
 
+function hasDuplicateMods(categories: CatDraft[]): boolean {
+  return new Set(categories.map((c) => c.modPrefix)).size !== categories.length;
+}
+
 export default function NewTournamentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -103,9 +107,13 @@ export default function NewTournamentPage() {
       (s) =>
         s.name.trim().length > 0 &&
         s.categories.length > 0 &&
-        s.categories.every((c) => c.slotCount >= 1 && c.slotCount <= 20) &&
-        new Set(s.categories.map((c) => c.modPrefix)).size ===
-          s.categories.length,
+        s.categories.every(
+          (c) =>
+            c.slotCount >= 1 &&
+            c.slotCount <= 20 &&
+            (c.modPrefix !== "TB" || c.slotCount === 1),
+        ) &&
+        !hasDuplicateMods(s.categories),
     );
 
   const handleSubmit = async () => {
@@ -189,6 +197,7 @@ export default function NewTournamentPage() {
                 const isDupMod =
                   stage.categories.filter((c) => c.modPrefix === cat.modPrefix)
                     .length > 1;
+                const isTB = cat.modPrefix === "TB";
                 return (
                   <div key={cat._id} className="cat-builder-row">
                     <select
@@ -216,16 +225,19 @@ export default function NewTournamentPage() {
                         min={1}
                         max={20}
                         value={cat.slotCount}
+                        disabled={isTB}
                         onChange={(e) =>
                           updateCat(stage._id, cat._id, {
-                            slotCount: Math.min(
-                              20,
-                              Math.max(1, parseInt(e.target.value) || 1),
-                            ),
+                            slotCount: isTB
+                              ? 1
+                              : Math.min(
+                                  20,
+                                  Math.max(1, parseInt(e.target.value) || 1),
+                                ),
                           })
                         }
                         style={{ width: "3.5rem" }}
-                        title="Number of slots"
+                        title={isTB ? "Tiebreaker is locked to 1 slot" : "Number of slots"}
                       />
                       <span className="slot-stats">slots</span>
                     </div>
@@ -243,10 +255,7 @@ export default function NewTournamentPage() {
                   </div>
                 );
               })}
-              {stage.categories.some(
-                (c, i, arr) =>
-                  arr.findIndex((o) => o.modPrefix === c.modPrefix) !== i,
-              ) && (
+              {hasDuplicateMods(stage.categories) && (
                 <p
                   style={{
                     color: "var(--mark)",
