@@ -3,6 +3,7 @@ WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+RUN mkdir -p /src/public
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/v1
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 RUN npm run build
