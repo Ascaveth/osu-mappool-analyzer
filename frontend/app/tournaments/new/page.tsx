@@ -305,7 +305,7 @@ export default function NewTournamentPage() {
           onClick={handleSubmit}
           disabled={!valid || submitting}
         >
-          {submitting ? "Creating…" : "Continue to Import →"}
+          {submitting ? "Creating…" : "Continue to Pool →"}
         </button>
       </div>
     </main>

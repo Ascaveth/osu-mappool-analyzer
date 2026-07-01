@@ -223,6 +223,7 @@ export default function PoolPage({
                             <input
                               className="field-input slot-input"
                               placeholder="paste beatmap URL or ID"
+                              aria-label={`Beatmap URL or ID for slot ${slot.code}`}
                               value={slotInputs[slot.id] ?? ""}
                               onChange={(e) =>
                                 setSlotInputs((prev) => ({
@@ -243,6 +244,7 @@ export default function PoolPage({
                                 !(slotInputs[slot.id] ?? "").trim()
                               }
                               title="Import & assign"
+                              aria-label={`Import and assign beatmap to slot ${slot.code}`}
                             >
                               {slotImporting[slot.id] ? "…" : "✓"}
                             </button>
@@ -254,6 +256,7 @@ export default function PoolPage({
                           className="btn btn-ghost pool-slot-clear"
                           onClick={() => clear(slot.id)}
                           title="Clear slot"
+                          aria-label={`Clear beatmap from slot ${slot.code}`}
                         >
                           ×
                         </button>
