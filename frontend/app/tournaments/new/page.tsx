@@ -32,10 +32,6 @@ const MOD_OPTIONS: { value: string; label: string }[] = [
   { value: "DT", label: "DT — Double Time" },
   { value: "FM", label: "FM — Free Mod" },
   { value: "TB", label: "TB — Tiebreaker" },
-  { value: "EX", label: "EX — EX" },
-  { value: "RC", label: "RC — Rice" },
-  { value: "LN", label: "LN — Long Note" },
-  { value: "CN", label: "CN — Coordination" },
 ];
 
 function draftId() {
