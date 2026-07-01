@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  weight: ["400", "500", "600"],
-});
+import { ThemeProvider } from "next-themes";
+import ThemeSwitch from "@/components/ui/theme-switch";
+import { Footer } from "@/components/Footer";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  axes: ["opsz", "SOFT", "WONK"],
 });
 
 export const metadata: Metadata = {
@@ -40,9 +44,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${fraunces.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <div className="theme-switcher">
+            <ThemeSwitch />
+          </div>
+          {children}
+          <Footer />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
