@@ -5,6 +5,8 @@ package memory
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -69,6 +71,61 @@ func (r *BeatmapRepository) FindByHash(_ context.Context, hash string) (*domain.
 		return nil, storage.ErrBeatmapNotFound
 	}
 	return cloneBeatmap(r.byID[id]), nil
+}
+
+func (r *BeatmapRepository) List(_ context.Context, opts storage.BeatmapListOptions) ([]domain.Beatmap, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	query := strings.ToLower(opts.Query)
+	mapper := strings.ToLower(opts.Mapper)
+
+	out := make([]domain.Beatmap, 0, len(r.byID))
+	for _, b := range r.byID {
+		if query != "" && !strings.Contains(strings.ToLower(b.Title), query) && !strings.Contains(strings.ToLower(b.Artist), query) {
+			continue
+		}
+		if mapper != "" && strings.ToLower(b.Mapper) != mapper {
+			continue
+		}
+		if opts.BPMMin != nil && b.BPM < *opts.BPMMin {
+			continue
+		}
+		if opts.BPMMax != nil && b.BPM > *opts.BPMMax {
+			continue
+		}
+		out = append(out, *cloneBeatmap(b))
+	}
+
+	// ID is an explicit final tiebreaker so ties on the primary key sort
+	// the same way on every call — map iteration order is randomized per
+	// range, so without this, rows with equal keys (e.g. duplicate
+	// titles) could shuffle between calls and skip or duplicate across
+	// cursor-paginated pages.
+	less := func(i, j int) bool {
+		switch opts.SortBy {
+		case "bpm":
+			if out[i].BPM != out[j].BPM {
+				return out[i].BPM < out[j].BPM
+			}
+		case "length_seconds":
+			if out[i].LengthSeconds != out[j].LengthSeconds {
+				return out[i].LengthSeconds < out[j].LengthSeconds
+			}
+		default:
+			if out[i].Title != out[j].Title {
+				return out[i].Title < out[j].Title
+			}
+		}
+		return out[i].ID < out[j].ID
+	}
+	if opts.SortDescending {
+		sort.Slice(out, func(i, j int) bool { return less(j, i) })
+	} else {
+		sort.Slice(out, func(i, j int) bool { return less(i, j) })
+	}
+
+	return out, nil
 }
 
 // cloneBeatmap returns a deep copy of b, so callers holding the returned
