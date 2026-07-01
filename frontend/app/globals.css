@@ -622,6 +622,12 @@ body {
   color: var(--paper);
 }
 
+.pool-apply-all {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
 /* === Wizard navigation === */
 
 .wizard-nav {

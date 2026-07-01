@@ -22,6 +22,7 @@ export default function PoolPage({
   const [slotInputs, setSlotInputs] = useState<Record<string, string>>({});
   const [slotImporting, setSlotImporting] = useState<Record<string, boolean>>({});
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
+  const [applyingAll, setApplyingAll] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -42,6 +43,14 @@ export default function PoolPage({
     [];
   const filledCount = allSlots.filter((sl) => sl.beatmap !== null).length;
   const totalCount = allSlots.length;
+  const pendingSlotIds = allSlots
+    .filter(
+      (sl) =>
+        sl.beatmap === null &&
+        !slotImporting[sl.id] &&
+        (slotInputs[sl.id] ?? "").trim()
+    )
+    .map((sl) => sl.id);
 
   const importAndAssign = async (slotId: string) => {
     const url = (slotInputs[slotId] ?? "").trim();
@@ -88,6 +97,15 @@ export default function PoolPage({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to clear slot");
     }
+  };
+
+  const applyAll = async () => {
+    if (pendingSlotIds.length === 0) return;
+    setApplyingAll(true);
+    await Promise.allSettled(
+      pendingSlotIds.map((slotId) => importAndAssign(slotId))
+    );
+    setApplyingAll(false);
   };
 
   const runAnalysis = () => {
@@ -269,6 +287,19 @@ export default function PoolPage({
           </section>
         ))}
       </div>
+
+      {pendingSlotIds.length > 0 && (
+        <div className="pool-apply-all">
+          <button
+            className="btn btn-ghost"
+            onClick={applyAll}
+            disabled={applyingAll}
+            title="Import & assign all pasted beatmaps"
+          >
+            {applyingAll ? "Applying…" : `Apply All (${pendingSlotIds.length})`}
+          </button>
+        </div>
+      )}
 
       <div className="wizard-nav">
         <span className="wizard-step-indicator">
