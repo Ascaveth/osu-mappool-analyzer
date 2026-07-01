@@ -283,7 +283,7 @@ export default function PoolPage({
         <button
           className="btn btn-primary"
           onClick={runAnalysis}
-          disabled={running || filledCount < totalCount}
+          disabled={running || totalCount === 0 || filledCount < totalCount}
         >
           {running ? "Running Analysis…" : "Run Analysis →"}
         </button>
