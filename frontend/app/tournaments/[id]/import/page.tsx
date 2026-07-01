@@ -21,28 +21,44 @@ export default function ImportPage({
   const [errors, setErrors] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [beatmapsLoadError, setBeatmapsLoadError] = useState<string | null>(null);
-  const [retryKey, setRetryKey] = useState(0);
+  const [tournamentRetryKey, setTournamentRetryKey] = useState(0);
+  const [beatmapsRetryKey, setBeatmapsRetryKey] = useState(0);
 
   useEffect(() => {
+    let ignore = false;
     api
       .getTournament(id)
       .then((t) => {
+        if (ignore) return;
         setTournament(t);
         setLoadError(null);
       })
-      .catch((e) =>
-        setLoadError(e instanceof Error ? e.message : "Failed to load tournament"),
-      );
+      .catch((e) => {
+        if (ignore) return;
+        setLoadError(e instanceof Error ? e.message : "Failed to load tournament");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [id, tournamentRetryKey]);
+
+  useEffect(() => {
+    let ignore = false;
     api
       .listBeatmaps()
       .then((bms) => {
+        if (ignore) return;
         setBeatmaps(bms);
         setBeatmapsLoadError(null);
       })
-      .catch((e) =>
-        setBeatmapsLoadError(e instanceof Error ? e.message : "Failed to load beatmaps"),
-      );
-  }, [id, retryKey]);
+      .catch((e) => {
+        if (ignore) return;
+        setBeatmapsLoadError(e instanceof Error ? e.message : "Failed to load beatmaps");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [beatmapsRetryKey]);
 
   const importUrls = useCallback(async (raw: string) => {
     const urls = raw
@@ -51,6 +67,7 @@ export default function ImportPage({
       .filter(Boolean);
     if (urls.length === 0) return;
     setImporting(true);
+    setErrors([]);
     const errs: string[] = [];
     for (const url of urls) {
       try {
@@ -97,7 +114,7 @@ export default function ImportPage({
         <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
           <button
             className="btn btn-ghost"
-            onClick={() => setRetryKey((k) => k + 1)}
+            onClick={() => setTournamentRetryKey((k) => k + 1)}
           >
             Retry
           </button>
@@ -179,7 +196,7 @@ export default function ImportPage({
           <button
             className="btn btn-ghost"
             style={{ marginLeft: "0.5rem", padding: "0.1rem 0.4rem" }}
-            onClick={() => setRetryKey((k) => k + 1)}
+            onClick={() => setBeatmapsRetryKey((k) => k + 1)}
           >
             Retry
           </button>
