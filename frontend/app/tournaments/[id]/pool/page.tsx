@@ -273,11 +273,17 @@ export default function PoolPage({
       <div className="wizard-nav">
         <span className="wizard-step-indicator">
           {filledCount} / {totalCount} slots filled
+          {filledCount < totalCount && (
+            <span style={{ color: "var(--mark)" }}>
+              {" "}· {totalCount - filledCount} slot
+              {totalCount - filledCount !== 1 ? "s" : ""} still need a beatmap
+            </span>
+          )}
         </span>
         <button
           className="btn btn-primary"
           onClick={runAnalysis}
-          disabled={running}
+          disabled={running || filledCount < totalCount}
         >
           {running ? "Running Analysis…" : "Run Analysis →"}
         </button>
