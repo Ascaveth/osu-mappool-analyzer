@@ -17,9 +17,10 @@ type tournamentConfigurationDTO struct {
 }
 
 type stageConfigDTO struct {
-	Name       string              `json:"name"`
-	Order      int                 `json:"order"`
-	Categories []categoryConfigDTO `json:"categories"`
+	Name                string              `json:"name"`
+	Order               int                 `json:"order"`
+	Categories          []categoryConfigDTO `json:"categories"`
+	ProjectedStarRating *float64            `json:"projectedStarRating"`
 }
 
 type categoryConfigDTO struct {
@@ -48,10 +49,11 @@ type tournamentDTO struct {
 }
 
 type stageDTO struct {
-	ID         string        `json:"id"`
-	Name       string        `json:"name"`
-	Order      int           `json:"order"`
-	Categories []categoryDTO `json:"categories"`
+	ID                  string        `json:"id"`
+	Name                string        `json:"name"`
+	Order               int           `json:"order"`
+	Categories          []categoryDTO `json:"categories"`
+	ProjectedStarRating *float64      `json:"projected_star_rating"`
 }
 
 type categoryDTO struct {
@@ -153,7 +155,36 @@ func toStageDTO(s domain.Stage) stageDTO {
 	for i, c := range s.Categories {
 		cats[i] = toCategoryDTO(c)
 	}
-	return stageDTO{ID: s.ID, Name: s.Name, Order: s.Order, Categories: cats}
+	return stageDTO{
+		ID:                  s.ID,
+		Name:                s.Name,
+		Order:               s.Order,
+		Categories:          cats,
+		ProjectedStarRating: effectiveProjectedStarRating(s),
+	}
+}
+
+// effectiveProjectedStarRating returns Stage's explicit
+// ProjectedStarRating if set, otherwise falls back to the star rating of
+// the stage's "NM1" beatmap (first category named "NM", slot position 1)
+// if that slot is filled. Returns nil if neither is available — a
+// presentation default computed fresh on every call, never persisted.
+func effectiveProjectedStarRating(s domain.Stage) *float64 {
+	if s.ProjectedStarRating != nil {
+		return s.ProjectedStarRating
+	}
+	for _, c := range s.Categories {
+		if c.Name != "NM" {
+			continue
+		}
+		for _, slot := range c.Slots {
+			if slot.Position == 1 && slot.Beatmap != nil {
+				sr := slot.Beatmap.StarRating
+				return &sr
+			}
+		}
+	}
+	return nil
 }
 
 func toCategoryDTO(c domain.Category) categoryDTO {
@@ -271,7 +302,7 @@ func (dto tournamentConfigurationDTO) toDomain() *domain.Tournament {
 			}
 			cats[j] = domain.Category{Name: c.Name, Order: c.Order, Slots: slots}
 		}
-		stages[i] = domain.Stage{Name: s.Name, Order: s.Order, Categories: cats}
+		stages[i] = domain.Stage{Name: s.Name, Order: s.Order, Categories: cats, ProjectedStarRating: s.ProjectedStarRating}
 	}
 	return &domain.Tournament{Name: dto.Name, Edition: dto.Edition, Stages: stages}
 }

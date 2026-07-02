@@ -20,6 +20,15 @@ type Stage struct {
 	Name       string
 	Order      int
 	Categories []Category
+
+	// ProjectedStarRating is an optional organizer-entered target
+	// difficulty for this stage, set at tournament-creation time. Nil
+	// means unset — API responses fall back to the stage's "NM1" (first
+	// category named "NM", slot position 1) beatmap's StarRating in that
+	// case (see api.effectiveProjectedStarRating). This is a genuine user
+	// input, not derived data, so it is persisted; the NM1 fallback
+	// itself is computed fresh on every response, never cached.
+	ProjectedStarRating *float64
 }
 
 // Category is a mod/intent grouping within a Stage (NM, HD, HR, ...).

@@ -8,6 +8,9 @@ export interface CreateStageInput {
   name: string;
   order: number;
   categories: CreateCategoryInput[];
+  // Optional organizer-entered target Star Rating; omitted means unset
+  // (falls back to the stage's NM1 beatmap's star rating once filled).
+  projectedStarRating?: number;
 }
 
 export interface CreateTournamentInput {

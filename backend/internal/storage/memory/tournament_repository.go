@@ -217,6 +217,10 @@ func cloneTournament(t *domain.Tournament) *domain.Tournament {
 
 func cloneStage(s *domain.Stage) *domain.Stage {
 	clone := *s
+	if s.ProjectedStarRating != nil {
+		psr := *s.ProjectedStarRating
+		clone.ProjectedStarRating = &psr
+	}
 	clone.Categories = make([]domain.Category, len(s.Categories))
 	for i, cat := range s.Categories {
 		clone.Categories[i] = *cloneCategory(&cat)

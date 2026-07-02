@@ -199,7 +199,14 @@ export default function PoolPage({
                 marginBottom: "0.5rem",
               }}
             >
-              <h2 className="stage-name">{stage.name}</h2>
+              <div className="stage-head-title">
+                <h2 className="stage-name">{stage.name}</h2>
+                {stage.projectedStarRating != null && (
+                  <span className="stage-meta">
+                    ★ {stage.projectedStarRating.toFixed(2)} projected
+                  </span>
+                )}
+              </div>
             </div>
 
             {stage.categories.map((cat) => (

@@ -77,6 +77,9 @@ export interface Stage {
   name: string;
   order: number;
   categories: Category[];
+  // The organizer's explicit target, or the stage's NM1 beatmap's star
+  // rating if unset; null if neither is available.
+  projectedStarRating: number | null;
 }
 
 export interface Tournament {

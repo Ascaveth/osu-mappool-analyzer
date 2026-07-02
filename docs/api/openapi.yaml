@@ -555,6 +555,14 @@ components:
           type: array
           minItems: 1
           items: { $ref: "#/components/schemas/CategoryConfiguration" }
+        projectedStarRating:
+          type: [number, "null"]
+          minimum: 0
+          description: >
+            Optional organizer-entered target Star Rating for this stage.
+            Omitted or null means unset — the Stage resource's
+            `projected_star_rating` then falls back to the stage's NM1
+            beatmap's star rating instead.
 
     CategoryConfiguration:
       type: object
@@ -594,6 +602,13 @@ components:
         categories:
           type: array
           items: { $ref: "#/components/schemas/Category" }
+        projected_star_rating:
+          type: [number, "null"]
+          readOnly: true
+          description: >
+            The organizer's explicit projectedStarRating if one was set at
+            creation, otherwise the stage's NM1 beatmap's star_rating if
+            that slot is filled. Null if neither is available.
 
     Category:
       type: object

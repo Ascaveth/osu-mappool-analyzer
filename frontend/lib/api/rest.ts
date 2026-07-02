@@ -42,6 +42,7 @@ interface WireStage {
   name: string;
   order: number;
   categories: WireCategory[];
+  projected_star_rating: number | null;
 }
 
 interface WireTournament {
@@ -158,6 +159,7 @@ function toStage(w: WireStage, beatmapsById: Map<string, Beatmap>): Stage {
     name: w.name,
     order: w.order,
     categories: w.categories.map((c) => toCategory(c, beatmapsById)),
+    projectedStarRating: w.projected_star_rating ?? null,
   };
 }
 
@@ -260,6 +262,7 @@ export function createRestClient(baseUrl: string): ApiClient {
             order: cat.order,
             slotCount: cat.slotCount,
           })),
+          projectedStarRating: st.projectedStarRating,
         })),
       };
       const res = await request(baseUrl, "/tournaments", {
