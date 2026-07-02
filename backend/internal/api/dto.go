@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis/tournament"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
@@ -160,31 +161,8 @@ func toStageDTO(s domain.Stage) stageDTO {
 		Name:                s.Name,
 		Order:               s.Order,
 		Categories:          cats,
-		ProjectedStarRating: effectiveProjectedStarRating(s),
+		ProjectedStarRating: tournament.EffectiveProjectedStarRating(s),
 	}
-}
-
-// effectiveProjectedStarRating returns Stage's explicit
-// ProjectedStarRating if set, otherwise falls back to the star rating of
-// the stage's "NM1" beatmap (first category named "NM", slot position 1)
-// if that slot is filled. Returns nil if neither is available — a
-// presentation default computed fresh on every call, never persisted.
-func effectiveProjectedStarRating(s domain.Stage) *float64 {
-	if s.ProjectedStarRating != nil {
-		return s.ProjectedStarRating
-	}
-	for _, c := range s.Categories {
-		if c.Name != "NM" {
-			continue
-		}
-		for _, slot := range c.Slots {
-			if slot.Position == 1 && slot.Beatmap != nil {
-				sr := slot.Beatmap.StarRating
-				return &sr
-			}
-		}
-	}
-	return nil
 }
 
 func toCategoryDTO(c domain.Category) categoryDTO {

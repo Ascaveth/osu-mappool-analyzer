@@ -56,6 +56,7 @@ func Beatmap(raw *osufile.RawBeatmap, sourceBytes []byte) (*domain.Beatmap, erro
 		HitObjects:   hitObjects,
 		ObjectCount:  len(hitObjects),
 		OsuFileHash:  hashSource(sourceBytes),
+		OsuBeatmapID: parseOsuBeatmapID(raw.Metadata["BeatmapID"]),
 	}
 
 	if bm.ObjectCount > 0 {
@@ -110,6 +111,25 @@ func requireFloat(d map[string]string, key string) (float64, error) {
 		return 0, fmt.Errorf("invalid [Difficulty] field %q: %w", key, err)
 	}
 	return v, nil
+}
+
+// parseOsuBeatmapID parses the .osu file's [Metadata] BeatmapID field into
+// osu!'s numeric beatmap ID. Returns nil when the field is absent, blank,
+// non-numeric, or non-positive (0/negative BeatmapID values appear in
+// locally-authored/never-submitted .osu files and don't identify a real
+// osu! beatmap) — a nil OsuBeatmapID is a permanent, expected state for
+// such maps, resolved later at enrichment time via checksum lookup
+// (internal/enrich), not an error here.
+func parseOsuBeatmapID(raw string) *int64 {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	id, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil || id <= 0 {
+		return nil
+	}
+	return &id
 }
 
 // parseFloatOr parses raw as a float64 and returns fallback if parsing fails.

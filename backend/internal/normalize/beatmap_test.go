@@ -242,3 +242,44 @@ OverallDifficulty:5
 			bm.ObjectCount, bm.LengthSeconds, bm.SliderRatio)
 	}
 }
+
+func TestBeatmap_OsuBeatmapIDPlaceholderZeroIsNil(t *testing.T) {
+	// sample.osu's [Metadata] carries "BeatmapID:0", the placeholder osu!
+	// uses for a never-submitted map — this must normalize to nil, not 0,
+	// since 0 doesn't identify a real osu! beatmap to query.
+	source, raw := parseTestdata(t, "../osufile/testdata/sample.osu")
+	bm, err := Beatmap(raw, source)
+	if err != nil {
+		t.Fatalf("Beatmap returned error: %v", err)
+	}
+	if bm.OsuBeatmapID != nil {
+		t.Errorf("OsuBeatmapID = %v, want nil for placeholder BeatmapID:0", *bm.OsuBeatmapID)
+	}
+}
+
+func TestBeatmap_OsuBeatmapIDParsedWhenPositive(t *testing.T) {
+	input := `osu file format v14
+
+[Metadata]
+BeatmapID:123456
+
+[Difficulty]
+HPDrainRate:5
+CircleSize:4
+OverallDifficulty:5
+
+[TimingPoints]
+0,500,4,2,0,100,1,0
+`
+	raw, err := osufile.Parse(bytes.NewReader([]byte(input)))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	bm, err := Beatmap(raw, []byte(input))
+	if err != nil {
+		t.Fatalf("Beatmap returned error: %v", err)
+	}
+	if bm.OsuBeatmapID == nil || *bm.OsuBeatmapID != 123456 {
+		t.Errorf("OsuBeatmapID = %v, want 123456", bm.OsuBeatmapID)
+	}
+}
