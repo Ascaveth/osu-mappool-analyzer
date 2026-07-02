@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SITE_TAGLINE } from "@/lib/site-metadata";
 
 /**
- * Sitewide footer, styled as the colophon page of a printed programme.
+ * Sitewide footer with site navigation and project info.
  */
 export function Footer() {
   return (
@@ -22,14 +22,14 @@ export function Footer() {
         </div>
 
         <div>
-          <p className="footer-heading">Colophon</p>
+          <p className="footer-heading">About</p>
           <ul className="footer-links">
             <li>
               <a href="https://github.com/Ascaveth/osu-mappool-analyzer" target="_blank" rel="noopener noreferrer">
                 Source on GitHub
               </a>
             </li>
-            <li className="footer-meta-line">Demo build · analysis engine v0.1</li>
+            <li className="footer-meta-line">Alpha Build - v1.00</li>
           </ul>
         </div>
       </div>

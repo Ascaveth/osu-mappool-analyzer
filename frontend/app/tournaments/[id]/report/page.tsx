@@ -154,7 +154,7 @@ export default function ReportPage({
         />
       ))}
 
-      <p className="colophon">
+      <p className="footer-note">
         ⁂ End of report · {tournament.name}
         {tournament.edition ? ` ${tournament.edition}` : ""}
       </p>
