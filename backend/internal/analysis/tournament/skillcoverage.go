@@ -176,8 +176,15 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 
 	var findings []domain.Finding
 
+	sortedSkillsets := make([]Skillset, 0, len(skillsetCounts))
+	for s := range skillsetCounts {
+		sortedSkillsets = append(sortedSkillsets, s)
+	}
+	sort.Slice(sortedSkillsets, func(i, j int) bool { return sortedSkillsets[i] < sortedSkillsets[j] })
+
 	maxShare, maxSkillset := 0.0, Skillset("")
-	for s, count := range skillsetCounts {
+	for _, s := range sortedSkillsets {
+		count := skillsetCounts[s]
 		metrics["skillset_count_"+string(s)] = float64(count)
 		share := float64(count) / float64(filledSlots)
 		if share > maxShare {
