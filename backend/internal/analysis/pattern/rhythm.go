@@ -69,8 +69,7 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 	fallbackBeatLengthMs := 60000.0 / bm.BPM
 
 	burstCount, streamCount, longestRun := 0, 0, 0
-	runLength := 1
-	finalizeRun := func(length int) {
+	for _, length := range runLengths(circles, timingPoints, fallbackBeatLengthMs) {
 		if length > longestRun {
 			longestRun = length
 		}
@@ -82,19 +81,6 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 		}
 	}
 
-	for i := 1; i < len(circles); i++ {
-		ioi := circles[i].StartTime - circles[i-1].StartTime
-		beatLengthMs := localBeatLengthMs(timingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
-		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
-		if ioi <= snapThreshold {
-			runLength++
-			continue
-		}
-		finalizeRun(runLength)
-		runLength = 1
-	}
-	finalizeRun(runLength)
-
 	return analysis.Result{Metrics: map[string]float64{
 		"burst_count":        float64(burstCount),
 		"stream_count":       float64(streamCount),
@@ -102,23 +88,64 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 	}}, nil
 }
 
-// localBeatLengthMs returns the beat length (ms) of the uninherited timing
-// point active at time t — the most recent uninherited point at or before
-// t in sortedPoints (sorted ascending by Offset). Falls back to
-// fallbackMs when no such point exists (e.g. t precedes every timing
-// point, or the beatmap has none at all).
-func localBeatLengthMs(sortedPoints []domain.TimingPoint, t time.Duration, fallbackMs float64) float64 {
-	beatLength := 0.0
-	for _, p := range sortedPoints {
-		if p.Offset > t {
-			break
-		}
-		if p.Uninherited && p.BeatLength > 0 {
-			beatLength = p.BeatLength
-		}
+// runLengths groups consecutive circles into runs by inter-onset interval
+// (IOI): a circle continues the current run when its IOI from the previous
+// circle is at or under the local snap threshold, otherwise the run ends
+// and a new one starts. It returns the length of every run found, in order.
+// Shared by StreamBurstAnalyzer and skillset classification
+// (see ComputeSkillsetProfile) so the two stay consistent; callers apply
+// their own length-to-classification thresholds.
+func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPoint, fallbackBeatLengthMs float64) []int {
+	if len(circles) == 0 {
+		return nil
 	}
-	if beatLength > 0 {
-		return beatLength
+	var lengths []int
+	runLength := 1
+	cursor := timingPointCursor{}
+	for i := 1; i < len(circles); i++ {
+		ioi := circles[i].StartTime - circles[i-1].StartTime
+		beatLengthMs := cursor.beatLengthMs(sortedTimingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
+		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
+		if ioi <= snapThreshold {
+			runLength++
+			continue
+		}
+		lengths = append(lengths, runLength)
+		runLength = 1
+	}
+	lengths = append(lengths, runLength)
+	return lengths
+}
+
+// timingPointCursor tracks the active uninherited beat length while
+// scanning timing points in time order, so repeated lookups over a
+// monotonically increasing sequence of query times (as runLengths performs)
+// advance through the timing points once instead of rescanning from the
+// start each time.
+type timingPointCursor struct {
+	idx        int
+	beatLength float64
+}
+
+// beatLengthMs returns the beat length (ms) of the uninherited timing point
+// active at time t — the most recent uninherited point at or before t in
+// sortedPoints (sorted ascending by Offset). Falls back to fallbackMs when
+// no such point has been seen (e.g. t precedes every timing point, or the
+// beatmap has none at all).
+//
+// Callers must invoke this with non-decreasing t across the cursor's
+// lifetime (as runLengths does, since circles are processed in time order);
+// the cursor only advances forward and never rescans earlier points.
+func (c *timingPointCursor) beatLengthMs(sortedPoints []domain.TimingPoint, t time.Duration, fallbackMs float64) float64 {
+	for c.idx < len(sortedPoints) && sortedPoints[c.idx].Offset <= t {
+		p := sortedPoints[c.idx]
+		if p.Uninherited && p.BeatLength > 0 {
+			c.beatLength = p.BeatLength
+		}
+		c.idx++
+	}
+	if c.beatLength > 0 {
+		return c.beatLength
 	}
 	return fallbackMs
 }

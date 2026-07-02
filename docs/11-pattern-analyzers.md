@@ -34,6 +34,10 @@ Classifies runs of circles whose inter-onset interval is at or below **1/4 beat 
 
 `SliderComplexityAnalyzer` reports `slider_count`, `avg_anchor_count`, and `reverse_slider_ratio` (proportion of sliders with at least one repeat). `SpinnerUsageAnalyzer` reports `spinner_count`, `total_spinner_duration_seconds`, and `spinner_density` (spinner time as a fraction of the beatmap's total length). Both follow the same data-quality-only finding philosophy established in Phase 6: a slider with **zero curve anchor points** (a slider with no path at all — only possible from malformed/misparsed source data) and a spinner with **non-positive duration** (end time at or before start time — likewise only possible from malformed data) each raise a Warning. Neither analyzer judges whether a beatmap's *amount* of slider complexity or spinner usage is appropriate.
 
+## Shared classification primitive
+
+`skillset.go`'s `ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile` is a plain exported function, not an `Analyzer` — it reuses this package's private helpers (`landingObjects`, `distance`, `localBeatLengthMs`, etc., the same way `orderedHitObjects` already is shared internally) to recompute the jump-distance, stream-run, slider-anchor, and spinner-density primitives this phase's analyzers already report, as one profile a Tournament Analyzer can classify beatmaps against. It exists specifically so `tournament.SkillCoverageAnalyzer` ([docs/12-tournament-analyzers.md](12-tournament-analyzers.md)) can classify skillsets (aim, stream, tech, jump, alt) without depending on this package's `Analyzer` implementations, which would violate "analyzers never call each other." This closes the "missing skill coverage" gap named in [docs/12-tournament-analyzers.md](12-tournament-analyzers.md).
+
 ## What is not implemented in this phase
 
 - **Cross-screen movement and "flow"/"precision" as holistic scores.** The roadmap names these under Movement, but they're aggregate judgments over a full pattern sequence (e.g. "does this map favor smooth, continuous motion or sharp direction reversals") rather than single measurable quantities. `JumpAngleAnalyzer`'s `sharp_turn_count` and `avg_angle_degrees` are the measurable primitives a future flow-scoring analyzer would build on — that synthesis is deferred until there's a defensible basis for combining them (see [Architecture Principle 9](04-architecture-principles.md#9-reports-speak-in-conclusions-not-raw-numbers): a flow "score" must mean something, not just exist).
@@ -49,6 +53,8 @@ Classifies runs of circles whose inter-onset interval is at or below **1/4 beat 
 - `StreamBurstAnalyzer`: stream detection (8 notes), burst detection (4 notes), widely-spaced notes producing no runs, zero-BPM safety (no panic, no division by zero).
 - `SliderComplexityAnalyzer` / `SpinnerUsageAnalyzer`: metric computation plus their respective malformed-data finding conditions, and empty-object-list edge cases.
 - An integration test running all five analyzers through a real `analysis.Engine` together.
+
+`backend/internal/analysis/pattern/skillset_test.go`, 5 tests, covering `ComputeSkillsetProfile` directly: wide-jump distance, stream-run detection, slider anchor/reverse-ratio computation, and zero-BPM/empty-HitObjects cases that must not panic.
 
 Run with:
 

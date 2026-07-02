@@ -34,6 +34,7 @@ func main() {
 		tournament.ProgressionAnalyzer{},
 		tournament.BalanceAnalyzer{},
 		tournament.DiversityAnalyzer{},
+		tournament.SkillCoverageAnalyzer{},
 	} {
 		if err := engine.Register(a); err != nil {
 			log.Fatalf("registering analyzer %q: %v", a.Name(), err)
