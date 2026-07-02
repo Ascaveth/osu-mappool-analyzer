@@ -4,8 +4,10 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis/pattern"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
@@ -14,6 +16,37 @@ func bm(id, mapper, artist, title string, ar, od, sliderRatio, bpm float64) *dom
 }
 
 func slot(id string, b *domain.Beatmap) domain.Slot { return domain.Slot{ID: id, Beatmap: b} }
+
+func ms(n int) time.Duration { return time.Duration(n) * time.Millisecond }
+
+// jumpBeatmap returns a beatmap classified "jump"/"aim" by DefaultTaxonomy:
+// wide, evenly-spaced jumps and no sliders.
+func jumpBeatmap(id string) *domain.Beatmap {
+	return &domain.Beatmap{ID: id, HitObjects: []domain.HitObject{
+		{Type: domain.HitObjectCircle, X: 0, Y: 0, StartTime: ms(0), EndTime: ms(0)},
+		{Type: domain.HitObjectCircle, X: 300, Y: 0, StartTime: ms(500), EndTime: ms(500)},
+		{Type: domain.HitObjectCircle, X: 0, Y: 0, StartTime: ms(1000), EndTime: ms(1000)},
+	}}
+}
+
+// streamBeatmap returns a beatmap classified "stream" by DefaultTaxonomy:
+// an 8-note run at 1/4 snap under 180 BPM (mirrors
+// pattern.TestComputeSkillsetProfile_Stream's construction).
+func streamBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 8; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, StartTime: ms(i * 80), EndTime: ms(i * 80)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
+}
+
+// unclassifiedBeatmap returns a beatmap matching no DefaultTaxonomy rule: a
+// single circle, no jumps, no run, no sliders.
+func unclassifiedBeatmap(id string) *domain.Beatmap {
+	return &domain.Beatmap{ID: id, HitObjects: []domain.HitObject{
+		{Type: domain.HitObjectCircle, StartTime: ms(0), EndTime: ms(0)},
+	}}
+}
 
 // --- CompositionAnalyzer ---
 
@@ -309,12 +342,195 @@ func TestDiversityAnalyzer_DistinctSongsProduceNoFindings(t *testing.T) {
 	}
 }
 
+// --- SkillCoverageAnalyzer ---
+
+func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", jumpBeatmap("bm1")),
+					slot("s2", jumpBeatmap("bm2")),
+					slot("s3", jumpBeatmap("bm3")),
+					slot("s4", streamBeatmap("bm4")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["filled_slots"]; got != 4 {
+		t.Errorf("filled_slots = %v, want 4", got)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "accounts for") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a skillset-overload finding (3 of 4 slots are jump/aim)")
+	}
+}
+
+func TestSkillCoverageAnalyzer_FlagsMissingSkillset(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", jumpBeatmap("bm1")),
+					slot("s2", jumpBeatmap("bm2")),
+					slot("s3", unclassifiedBeatmap("bm3")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "no beatmap covering skillset") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a missing-skillset finding (no stream/tech/alt beatmap present)")
+	}
+}
+
+func TestSkillCoverageAnalyzer_TooFewSlotsSkipsMissingSkillsetFinding(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", jumpBeatmap("bm1")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "no beatmap covering skillset") {
+			t.Error("missing-skillset finding should be suppressed below minSlotsForCoverageJudgment")
+		}
+	}
+}
+
+func TestSkillCoverageAnalyzer_MixedSkillsetsCountFilledSlotsOnce(t *testing.T) {
+	// A jump beatmap plus a stream beatmap that is also constructed with
+	// wide spacing would match two rules; here we just confirm a stage of
+	// two distinctly-classified beatmaps reports filled_slots == 2, not
+	// inflated by per-skillset counting.
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", jumpBeatmap("bm1")),
+					slot("s2", streamBeatmap("bm2")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["filled_slots"]; got != 2 {
+		t.Errorf("filled_slots = %v, want 2", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_CustomTaxonomyOverrideRespected(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", jumpBeatmap("bm1")),
+					slot("s2", jumpBeatmap("bm2")),
+				},
+			}},
+		}},
+	}
+
+	analyzer := SkillCoverageAnalyzer{Taxonomy: []SkillsetRule{
+		{Skillset: "everything", Match: func(pattern.SkillsetProfile) bool { return true }},
+	}}
+	result, err := analyzer.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_everything"]; got != 2 {
+		t.Errorf("skillset_count_everything = %v, want 2 (custom taxonomy must be respected, not the default)", got)
+	}
+	if _, ok := result.Metrics["skillset_count_jump"]; ok {
+		t.Error("default taxonomy's \"jump\" skillset must not appear when a custom Taxonomy is supplied")
+	}
+}
+
+func TestSkillCoverageAnalyzer_NoFilledSlotsDoesNotPanic(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{ID: "cat-1", Order: 1, Slots: []domain.Slot{{ID: "s1"}}}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
+	}
+}
+
 // --- Integration ---
 
 func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 	e := analysis.NewEngine()
 	for _, a := range []analysis.Analyzer{
-		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{},
+		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{}, SkillCoverageAnalyzer{},
 	} {
 		if err := e.Register(a); err != nil {
 			t.Fatalf("Register(%s): %v", a.Name(), err)
@@ -328,8 +544,9 @@ func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	// 1 tournament-scoped + 3 stage-scoped (Composition) + 3 stage-scoped
-	// (Diversity) + 3 category-scoped (Balance) = 10.
-	if len(results) != 10 {
-		t.Errorf("len(results) = %d, want 10", len(results))
+	// (Diversity) + 3 stage-scoped (SkillCoverage) + 3 category-scoped
+	// (Balance) = 13.
+	if len(results) != 13 {
+		t.Errorf("len(results) = %d, want 13", len(results))
 	}
 }
