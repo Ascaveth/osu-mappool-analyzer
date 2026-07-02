@@ -209,7 +209,9 @@ export default function PoolPage({
                   <div key={slot.id}>
                     <div className="slot-line">
                       <div
-                        className="slot-row slot-row--editable"
+                        className={`slot-row slot-row--editable${
+                          slotImporting[slot.id] ? " slot-row--loading" : ""
+                        }`}
                         style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
                       >
                         <span className={`slot-code${hasCover ? " slot-chip" : ""}`}>
@@ -263,7 +265,11 @@ export default function PoolPage({
                               title="Import & assign"
                               aria-label={`Import and assign beatmap to slot ${slot.code}`}
                             >
-                              {slotImporting[slot.id] ? "…" : "✓"}
+                              {slotImporting[slot.id] ? (
+                                <span className="spinner" aria-hidden="true" />
+                              ) : (
+                                "✓"
+                              )}
                             </button>
                           </>
                         )}
@@ -281,7 +287,7 @@ export default function PoolPage({
         ))}
       </div>
 
-      {pendingSlotIds.length > 0 && (
+      {(pendingSlotIds.length > 0 || applyingAll) && (
         <div className="pool-apply-all">
           <button
             className="btn btn-ghost"
@@ -289,7 +295,13 @@ export default function PoolPage({
             disabled={applyingAll}
             title="Import & assign all pasted beatmaps"
           >
-            {applyingAll ? "Applying…" : `Apply All (${pendingSlotIds.length})`}
+            {applyingAll ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Applying…
+              </>
+            ) : (
+              `Apply All (${pendingSlotIds.length})`
+            )}
           </button>
         </div>
       )}

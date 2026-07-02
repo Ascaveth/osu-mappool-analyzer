@@ -317,6 +317,36 @@ body {
   grid-template-columns: 3rem 1fr auto auto;
 }
 
+/* Dims a slot card while its beatmap import is in flight. */
+.slot-row--loading {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+/* === Spinner: small rotating ring for inline async actions === */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.5s;
+  }
+}
+
 .slot-code {
   font-family: var(--font-data), monospace;
   font-size: 0.75rem;
