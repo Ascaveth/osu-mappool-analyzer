@@ -23,6 +23,7 @@ export default function PoolPage({
   const [slotImporting, setSlotImporting] = useState<Record<string, boolean>>({});
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
   const [applyingAll, setApplyingAll] = useState(false);
+  const [applyingTotal, setApplyingTotal] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,6 +44,8 @@ export default function PoolPage({
     [];
   const filledCount = allSlots.filter((sl) => sl.beatmap !== null).length;
   const totalCount = allSlots.length;
+  const singleImportInFlight =
+    !applyingAll && Object.values(slotImporting).some(Boolean);
   const pendingSlotIds = allSlots
     .filter(
       (sl) =>
@@ -104,6 +107,7 @@ export default function PoolPage({
   const applyAll = async () => {
     if (pendingSlotIds.length === 0) return;
     setApplyingAll(true);
+    setApplyingTotal(pendingSlotIds.length);
     const queue = [...pendingSlotIds];
     const worker = async () => {
       let slotId: string | undefined;
@@ -297,10 +301,10 @@ export default function PoolPage({
           >
             {applyingAll ? (
               <>
-                <span className="spinner" aria-hidden="true" /> Applying…
+                <span className="spinner" aria-hidden="true" /> Importing…
               </>
             ) : (
-              `Apply All (${pendingSlotIds.length})`
+              `Import All (${pendingSlotIds.length})`
             )}
           </button>
         </div>
@@ -324,6 +328,17 @@ export default function PoolPage({
           {running ? "Running Analysis…" : "Run Analysis →"}
         </button>
       </div>
+
+      {(applyingAll || singleImportInFlight) && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <span className="spinner spinner--lg" aria-hidden="true" />
+          <span className="loading-overlay-text">
+            {applyingAll
+              ? `Importing ${applyingTotal} beatmap${applyingTotal === 1 ? "" : "s"}…`
+              : "Importing beatmap…"}
+          </span>
+        </div>
+      )}
     </main>
   );
 }
