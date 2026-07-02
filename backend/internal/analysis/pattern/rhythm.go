@@ -69,8 +69,7 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 	fallbackBeatLengthMs := 60000.0 / bm.BPM
 
 	burstCount, streamCount, longestRun := 0, 0, 0
-	runLength := 1
-	finalizeRun := func(length int) {
+	for _, length := range runLengths(circles, timingPoints, fallbackBeatLengthMs) {
 		if length > longestRun {
 			longestRun = length
 		}
@@ -82,24 +81,39 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 		}
 	}
 
-	for i := 1; i < len(circles); i++ {
-		ioi := circles[i].StartTime - circles[i-1].StartTime
-		beatLengthMs := localBeatLengthMs(timingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
-		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
-		if ioi <= snapThreshold {
-			runLength++
-			continue
-		}
-		finalizeRun(runLength)
-		runLength = 1
-	}
-	finalizeRun(runLength)
-
 	return analysis.Result{Metrics: map[string]float64{
 		"burst_count":        float64(burstCount),
 		"stream_count":       float64(streamCount),
 		"longest_run_length": float64(longestRun),
 	}}, nil
+}
+
+// runLengths groups consecutive circles into runs by inter-onset interval
+// (IOI): a circle continues the current run when its IOI from the previous
+// circle is at or under the local snap threshold, otherwise the run ends
+// and a new one starts. It returns the length of every run found, in order.
+// Shared by StreamBurstAnalyzer and skillset classification
+// (see ComputeSkillsetProfile) so the two stay consistent; callers apply
+// their own length-to-classification thresholds.
+func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPoint, fallbackBeatLengthMs float64) []int {
+	if len(circles) == 0 {
+		return nil
+	}
+	var lengths []int
+	runLength := 1
+	for i := 1; i < len(circles); i++ {
+		ioi := circles[i].StartTime - circles[i-1].StartTime
+		beatLengthMs := localBeatLengthMs(sortedTimingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
+		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
+		if ioi <= snapThreshold {
+			runLength++
+			continue
+		}
+		lengths = append(lengths, runLength)
+		runLength = 1
+	}
+	lengths = append(lengths, runLength)
+	return lengths
 }
 
 // localBeatLengthMs returns the beat length (ms) of the uninherited timing

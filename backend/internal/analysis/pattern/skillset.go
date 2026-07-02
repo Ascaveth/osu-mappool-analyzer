@@ -2,7 +2,6 @@ package pattern
 
 import (
 	"sort"
-	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
@@ -69,8 +68,8 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 			sort.SliceStable(timingPoints, func(i, j int) bool { return timingPoints[i].Offset < timingPoints[j].Offset })
 			fallbackBeatLengthMs := 60000.0 / bm.BPM
 
-			streamCount, longestRun, runLength := 0, 0, 1
-			finalizeRun := func(length int) {
+			streamCount, longestRun := 0, 0
+			for _, length := range runLengths(circles, timingPoints, fallbackBeatLengthMs) {
 				if length > longestRun {
 					longestRun = length
 				}
@@ -78,18 +77,6 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 					streamCount++
 				}
 			}
-			for i := 1; i < len(circles); i++ {
-				ioi := circles[i].StartTime - circles[i-1].StartTime
-				beatLengthMs := localBeatLengthMs(timingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
-				snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
-				if ioi <= snapThreshold {
-					runLength++
-					continue
-				}
-				finalizeRun(runLength)
-				runLength = 1
-			}
-			finalizeRun(runLength)
 			profile.StreamCount = streamCount
 			profile.LongestRunLength = longestRun
 		}
