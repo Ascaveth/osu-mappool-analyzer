@@ -200,6 +200,39 @@ body {
   margin-bottom: 3.5rem;
 }
 
+/* === Report page: sticky stage index (shown when a pool has several stages) === */
+
+.stage-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  padding: 0.75rem 0;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--paper-line);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.stage-nav-link {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding: 0.15rem 0;
+}
+
+.stage-nav-link:hover {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+
 .stage-head {
   display: grid;
   grid-template-columns: 1fr minmax(200px, 240px);
@@ -344,6 +377,22 @@ body {
   line-height: 1.6;
 }
 
+.note-mark--critical {
+  color: var(--mark);
+}
+
+.note-mark--warning {
+  color: var(--brass);
+}
+
+.note-mark--info {
+  color: var(--ink-soft);
+}
+
+.note-mark--ready {
+  color: var(--confirm);
+}
+
 .note-body {
   min-width: 0;
 }
@@ -473,6 +522,35 @@ body {
   border-color: var(--ink-soft);
 }
 
+/* === Alerts === */
+
+.alert {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--mark);
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--mark) 8%, transparent);
+}
+
+.alert-icon {
+  flex: none;
+  font-family: var(--font-data), monospace;
+  font-size: 0.75rem;
+  color: var(--mark);
+  line-height: 1.5;
+}
+
+.alert-text {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+}
+
 /* === Form fields === */
 
 .field {
@@ -552,6 +630,15 @@ body {
   flex-wrap: wrap;
 }
 
+/* Small label+control pair (e.g. star rating, slot count) that should never
+   stretch to fill its row. */
+.inline-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+
 /* === Drop zone === */
 
 .drop-zone {
@@ -584,6 +671,22 @@ body {
 
 /* === Pool builder layout === */
 
+.pool-stage {
+  margin-bottom: 2.5rem;
+}
+
+.pool-stage-head {
+  border-top: 1px solid var(--ink);
+  padding-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.pool-category-block {
+  border-top: 1px solid var(--paper-line);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
 .slot-input {
   grid-column: 2 / 4;
   min-width: 0;
@@ -607,8 +710,8 @@ body {
 
 .pool-slot-clear {
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   display: flex;
   align-items: center;
@@ -628,8 +731,8 @@ body {
 
 .pool-slot-confirm {
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   display: flex;
   align-items: center;
