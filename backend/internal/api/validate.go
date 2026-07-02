@@ -29,6 +29,9 @@ func validateTournamentConfiguration(dto tournamentConfigurationDTO) []FieldErro
 		if len(stage.Categories) < 1 {
 			errs = append(errs, FieldError{Field: prefix + ".categories", Message: "must contain at least 1 item"})
 		}
+		if stage.ProjectedStarRating != nil && *stage.ProjectedStarRating < 0 {
+			errs = append(errs, FieldError{Field: prefix + ".projectedStarRating", Message: "must be >= 0"})
+		}
 		for j, cat := range stage.Categories {
 			catPrefix := fmt.Sprintf("%s.categories[%d]", prefix, j)
 			if cat.Name == "" {

@@ -42,6 +42,7 @@ export const tournament: Tournament = {
       id: "stage-qualifiers",
       name: "Qualifiers",
       order: 1,
+      projectedStarRating: null,
       categories: [
         {
           id: "cat-q-nm",
@@ -97,6 +98,7 @@ export const tournament: Tournament = {
       id: "stage-ro16",
       name: "Round of 16",
       order: 2,
+      projectedStarRating: null,
       categories: [
         {
           id: "cat-r-nm",
@@ -129,6 +131,7 @@ export const tournament: Tournament = {
       id: "stage-finals",
       name: "Grand Finals",
       order: 3,
+      projectedStarRating: null,
       categories: [
         {
           id: "cat-f-nm",

@@ -173,6 +173,91 @@ func TestDeleteTournament(t *testing.T) {
 	}
 }
 
+// --- ProjectedStarRating ---
+
+func TestCreateTournament_ProjectedStarRatingRoundTrips(t *testing.T) {
+	s := newTestServer()
+	body := `{
+		"name": "Example Open",
+		"stages": [{
+			"name": "Qualifiers", "order": 1,
+			"projectedStarRating": 5.5,
+			"categories": [{ "name": "NM", "order": 1, "slotCount": 1 }]
+		}]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/tournaments", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	NewRouter(s).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var got tournamentDTO
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if got.Stages[0].ProjectedStarRating == nil || *got.Stages[0].ProjectedStarRating != 5.5 {
+		t.Errorf("ProjectedStarRating = %v, want 5.5", got.Stages[0].ProjectedStarRating)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/tournaments/"+got.ID, nil)
+	getRec := httptest.NewRecorder()
+	NewRouter(s).ServeHTTP(getRec, getReq)
+	var refetched tournamentDTO
+	json.NewDecoder(getRec.Body).Decode(&refetched)
+	if refetched.Stages[0].ProjectedStarRating == nil || *refetched.Stages[0].ProjectedStarRating != 5.5 {
+		t.Errorf("after GET, ProjectedStarRating = %v, want 5.5", refetched.Stages[0].ProjectedStarRating)
+	}
+}
+
+func TestCreateTournament_ProjectedStarRatingFallsBackToNM1(t *testing.T) {
+	s := newTestServer()
+	created := createTestTournament(t, s)
+
+	if got := created.Stages[0].ProjectedStarRating; got != nil {
+		t.Fatalf("ProjectedStarRating = %v, want nil (no override, NM1 unfilled)", got)
+	}
+
+	bm := importTestBeatmap(t, s, "../osufile/testdata/sample.osu")
+	nm1SlotID := created.Stages[0].Categories[0].Slots[0].ID
+	assignReq := httptest.NewRequest(http.MethodPut, "/v1/slots/"+nm1SlotID+"/beatmap",
+		strings.NewReader(`{"beatmap_id": "`+bm.ID+`"}`))
+	assignReq.Header.Set("Content-Type", "application/json")
+	assignRec := httptest.NewRecorder()
+	NewRouter(s).ServeHTTP(assignRec, assignReq)
+	if assignRec.Code != http.StatusOK {
+		t.Fatalf("assign status = %d, want 200; body = %s", assignRec.Code, assignRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/tournaments/"+created.ID, nil)
+	getRec := httptest.NewRecorder()
+	NewRouter(s).ServeHTTP(getRec, getReq)
+	var refetched tournamentDTO
+	json.NewDecoder(getRec.Body).Decode(&refetched)
+	if got := refetched.Stages[0].ProjectedStarRating; got == nil || *got != bm.StarRating {
+		t.Errorf("ProjectedStarRating = %v, want NM1 beatmap's StarRating (%v)", got, bm.StarRating)
+	}
+}
+
+func TestCreateTournament_NegativeProjectedStarRatingRejected(t *testing.T) {
+	s := newTestServer()
+	body := `{
+		"name": "Example Open",
+		"stages": [{
+			"name": "Qualifiers", "order": 1,
+			"projectedStarRating": -1,
+			"categories": [{ "name": "NM", "order": 1, "slotCount": 1 }]
+		}]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/tournaments", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	NewRouter(s).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestListTournaments(t *testing.T) {
 	s := newTestServer()
 	createTestTournament(t, s)

@@ -124,6 +124,7 @@ export function createMockClient(): ApiClient {
           id: uid(),
           name: st.name,
           order: st.order,
+          projectedStarRating: st.projectedStarRating ?? null,
           categories: st.categories.map((cat): Category => ({
             id: uid(),
             name: MOD_LABELS[cat.modPrefix] ?? cat.modPrefix,

@@ -16,6 +16,7 @@ interface StageDraft {
   _id: string;
   name: string;
   categories: CatDraft[];
+  projectedStarRating: string;
 }
 
 interface ProofNote {
@@ -43,11 +44,30 @@ function newCat(): CatDraft {
 }
 
 function newStage(): StageDraft {
-  return { _id: draftId(), name: "", categories: [newCat()] };
+  return { _id: draftId(), name: "", categories: [newCat()], projectedStarRating: "" };
 }
 
 function hasDuplicateMods(categories: CatDraft[]): boolean {
   return new Set(categories.map((c) => c.modPrefix)).size !== categories.length;
+}
+
+// A blank Star Rating is valid (unset — falls back to NM1). Otherwise it
+// must be a plain non-negative decimal, e.g. "6.75" — no letters, no
+// second decimal separator, nothing left over after normalizing a
+// comma-as-decimal input like "6,7" to "6.7".
+function isValidStarRating(raw: string): boolean {
+  const trimmed = raw.trim();
+  return trimmed === "" || /^\d+(\.\d+)?$/.test(trimmed);
+}
+
+// Accepts either "." or "," as the decimal separator (some locales/keyboards
+// only offer ","), normalizing to "." for storage/parsing. Anything that
+// isn't digits plus at most one separator is rejected outright rather than
+// silently truncated, so a stray letter never ends up "swallowed" into a
+// seemingly-valid number.
+function normalizeStarRatingInput(raw: string): string | null {
+  const normalized = raw.replace(",", ".");
+  return /^\d*\.?\d*$/.test(normalized) ? normalized : null;
 }
 
 function slotCodes(cat: CatDraft): string[] {
@@ -121,7 +141,8 @@ export default function NewTournamentPage() {
             c.slotCount <= 20 &&
             (c.modPrefix !== "TB" || c.slotCount === 1),
         ) &&
-        !hasDuplicateMods(s.categories),
+        !hasDuplicateMods(s.categories) &&
+        isValidStarRating(s.projectedStarRating),
     );
 
   const notes: ProofNote[] = [];
@@ -151,6 +172,14 @@ export default function NewTournamentPage() {
         source: label,
       });
     }
+    if (!isValidStarRating(s.projectedStarRating)) {
+      notes.push({
+        key: `${s._id}-sr`,
+        kind: "warn",
+        text: "Projected Star Rating must be a plain decimal number, e.g. 6.75.",
+        source: label,
+      });
+    }
   });
   if (valid) {
     notes.push({
@@ -176,6 +205,9 @@ export default function NewTournamentPage() {
             modPrefix: c.modPrefix,
             slotCount: c.slotCount,
           })),
+          projectedStarRating: s.projectedStarRating.trim()
+            ? Number(s.projectedStarRating)
+            : undefined,
         })),
       };
       const t = await api.createTournament(input);
@@ -223,6 +255,30 @@ export default function NewTournamentPage() {
                     placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
                     style={{ flex: 1 }}
                   />
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
+                    <input
+                      className="field-input"
+                      type="text"
+                      inputMode="decimal"
+                      aria-label="Projected star rating for this stage (optional)"
+                      aria-invalid={!isValidStarRating(stage.projectedStarRating)}
+                      title="Optional target Star Rating (e.g. 6.75) — defaults to this stage's NM1 beatmap once one is assigned"
+                      value={stage.projectedStarRating}
+                      onChange={(e) => {
+                        const normalized = normalizeStarRatingInput(e.target.value);
+                        if (normalized !== null) {
+                          updateStage(stage._id, { projectedStarRating: normalized });
+                        }
+                      }}
+                      style={{
+                        width: "4.5rem",
+                        borderColor: isValidStarRating(stage.projectedStarRating)
+                          ? undefined
+                          : "var(--mark)",
+                      }}
+                    />
+                    <span className="slot-stats">★ SR</span>
+                  </div>
                   {stages.length > 1 && (
                     <button
                       className="btn btn-ghost"
