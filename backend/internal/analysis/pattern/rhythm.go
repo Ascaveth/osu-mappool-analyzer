@@ -101,9 +101,10 @@ func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPo
 	}
 	var lengths []int
 	runLength := 1
+	cursor := timingPointCursor{}
 	for i := 1; i < len(circles); i++ {
 		ioi := circles[i].StartTime - circles[i-1].StartTime
-		beatLengthMs := localBeatLengthMs(sortedTimingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
+		beatLengthMs := cursor.beatLengthMs(sortedTimingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
 		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
 		if ioi <= snapThreshold {
 			runLength++
@@ -116,23 +117,35 @@ func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPo
 	return lengths
 }
 
-// localBeatLengthMs returns the beat length (ms) of the uninherited timing
-// point active at time t — the most recent uninherited point at or before
-// t in sortedPoints (sorted ascending by Offset). Falls back to
-// fallbackMs when no such point exists (e.g. t precedes every timing
-// point, or the beatmap has none at all).
-func localBeatLengthMs(sortedPoints []domain.TimingPoint, t time.Duration, fallbackMs float64) float64 {
-	beatLength := 0.0
-	for _, p := range sortedPoints {
-		if p.Offset > t {
-			break
-		}
+// timingPointCursor tracks the active uninherited beat length while
+// scanning timing points in time order, so repeated lookups over a
+// monotonically increasing sequence of query times (as runLengths performs)
+// advance through the timing points once instead of rescanning from the
+// start each time.
+type timingPointCursor struct {
+	idx        int
+	beatLength float64
+}
+
+// beatLengthMs returns the beat length (ms) of the uninherited timing point
+// active at time t — the most recent uninherited point at or before t in
+// sortedPoints (sorted ascending by Offset). Falls back to fallbackMs when
+// no such point has been seen (e.g. t precedes every timing point, or the
+// beatmap has none at all).
+//
+// Callers must invoke this with non-decreasing t across the cursor's
+// lifetime (as runLengths does, since circles are processed in time order);
+// the cursor only advances forward and never rescans earlier points.
+func (c *timingPointCursor) beatLengthMs(sortedPoints []domain.TimingPoint, t time.Duration, fallbackMs float64) float64 {
+	for c.idx < len(sortedPoints) && sortedPoints[c.idx].Offset <= t {
+		p := sortedPoints[c.idx]
 		if p.Uninherited && p.BeatLength > 0 {
-			beatLength = p.BeatLength
+			c.beatLength = p.BeatLength
 		}
+		c.idx++
 	}
-	if beatLength > 0 {
-		return beatLength
+	if c.beatLength > 0 {
+		return c.beatLength
 	}
 	return fallbackMs
 }
