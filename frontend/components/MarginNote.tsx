@@ -22,7 +22,10 @@ const ANALYZER_LABEL: Record<string, string> = {
 export function MarginNote({ citation }: { citation: Citation }) {
   return (
     <div className="note">
-      <span className="note-mark" aria-hidden="true">
+      <span
+        className={`note-mark note-mark--${citation.finding.severity}`}
+        aria-hidden="true"
+      >
         {GLYPH[citation.finding.severity]}
       </span>
       <div className="note-body">

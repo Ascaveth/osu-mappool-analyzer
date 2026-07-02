@@ -126,15 +126,10 @@ export default function PoolPage({
   if (error && !tournament) {
     return (
       <main className="programme">
-        <p
-          style={{
-            color: "var(--mark)",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.875rem",
-          }}
-        >
-          Error: {error}
-        </p>
+        <div className="alert" role="alert">
+          <span className="alert-icon" aria-hidden="true">▲</span>
+          <p className="alert-text">Error: {error}</p>
+        </div>
         <Link
           href="/tournaments/new"
           style={{
@@ -177,28 +172,16 @@ export default function PoolPage({
       </div>
 
       {error && (
-        <p
-          style={{
-            color: "var(--mark)",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.8125rem",
-            marginBottom: "1rem",
-          }}
-        >
-          ▲ {error}
-        </p>
+        <div className="alert" role="alert">
+          <span className="alert-icon" aria-hidden="true">▲</span>
+          <p className="alert-text">{error}</p>
+        </div>
       )}
 
       <div>
         {tournament.stages.map((stage) => (
-          <section key={stage.id} style={{ marginBottom: "2.5rem" }}>
-            <div
-              style={{
-                borderTop: "1px solid var(--ink)",
-                paddingTop: "0.75rem",
-                marginBottom: "0.5rem",
-              }}
-            >
+          <section key={stage.id} className="pool-stage">
+            <div className="pool-stage-head">
               <div className="stage-head-title">
                 <h2 className="stage-name">{stage.name}</h2>
                 {stage.projectedStarRating != null && (
@@ -210,14 +193,7 @@ export default function PoolPage({
             </div>
 
             {stage.categories.map((cat) => (
-              <div
-                key={cat.id}
-                style={{
-                  borderTop: "1px solid var(--paper-line)",
-                  paddingTop: "0.5rem",
-                  paddingBottom: "0.5rem",
-                }}
-              >
+              <div key={cat.id} className="pool-category-block">
                 <p className="category-name">
                   {modAccentColor(cat.slots[0]?.code ?? "") && (
                     <span
