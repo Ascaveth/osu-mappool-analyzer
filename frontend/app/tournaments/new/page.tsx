@@ -255,7 +255,7 @@ export default function NewTournamentPage() {
                     placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
                     style={{ flex: 1 }}
                   />
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
+                  <div className="inline-field">
                     <input
                       className="field-input"
                       type="text"
@@ -326,7 +326,7 @@ export default function NewTournamentPage() {
                             ))}
                           </select>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "none" }}>
+                        <div className="inline-field">
                           <input
                             className="field-input"
                             type="number"
@@ -381,16 +381,10 @@ export default function NewTournamentPage() {
           </div>
 
           {error && (
-            <p
-              style={{
-                color: "var(--mark)",
-                marginTop: "1rem",
-                fontFamily: "var(--font-data)",
-                fontSize: "0.8125rem",
-              }}
-            >
-              {error}
-            </p>
+            <div className="alert" role="alert">
+              <span className="alert-icon" aria-hidden="true">▲</span>
+              <p className="alert-text">{error}</p>
+            </div>
           )}
         </div>
 
@@ -405,9 +399,8 @@ export default function NewTournamentPage() {
               {notes.map((n) => (
                 <div className="note" key={n.key}>
                   <span
-                    className="note-mark"
+                    className={`note-mark note-mark--${n.kind === "ready" ? "ready" : "warning"}`}
                     aria-hidden="true"
-                    style={n.kind === "ready" ? { color: "var(--confirm)" } : undefined}
                   >
                     {n.kind === "ready" ? "✓" : "▲"}
                   </span>

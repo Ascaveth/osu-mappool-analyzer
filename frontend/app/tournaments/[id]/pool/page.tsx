@@ -23,6 +23,7 @@ export default function PoolPage({
   const [slotImporting, setSlotImporting] = useState<Record<string, boolean>>({});
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
   const [applyingAll, setApplyingAll] = useState(false);
+  const [applyingTotal, setApplyingTotal] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,6 +44,8 @@ export default function PoolPage({
     [];
   const filledCount = allSlots.filter((sl) => sl.beatmap !== null).length;
   const totalCount = allSlots.length;
+  const singleImportInFlight =
+    !applyingAll && Object.values(slotImporting).some(Boolean);
   const pendingSlotIds = allSlots
     .filter(
       (sl) =>
@@ -104,6 +107,7 @@ export default function PoolPage({
   const applyAll = async () => {
     if (pendingSlotIds.length === 0) return;
     setApplyingAll(true);
+    setApplyingTotal(pendingSlotIds.length);
     const queue = [...pendingSlotIds];
     const worker = async () => {
       let slotId: string | undefined;
@@ -126,15 +130,10 @@ export default function PoolPage({
   if (error && !tournament) {
     return (
       <main className="programme">
-        <p
-          style={{
-            color: "var(--mark)",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.875rem",
-          }}
-        >
-          Error: {error}
-        </p>
+        <div className="alert" role="alert">
+          <span className="alert-icon" aria-hidden="true">▲</span>
+          <p className="alert-text">Error: {error}</p>
+        </div>
         <Link
           href="/tournaments/new"
           style={{
@@ -177,28 +176,16 @@ export default function PoolPage({
       </div>
 
       {error && (
-        <p
-          style={{
-            color: "var(--mark)",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.8125rem",
-            marginBottom: "1rem",
-          }}
-        >
-          ▲ {error}
-        </p>
+        <div className="alert" role="alert">
+          <span className="alert-icon" aria-hidden="true">▲</span>
+          <p className="alert-text">{error}</p>
+        </div>
       )}
 
       <div>
         {tournament.stages.map((stage) => (
-          <section key={stage.id} style={{ marginBottom: "2.5rem" }}>
-            <div
-              style={{
-                borderTop: "1px solid var(--ink)",
-                paddingTop: "0.75rem",
-                marginBottom: "0.5rem",
-              }}
-            >
+          <section key={stage.id} className="pool-stage">
+            <div className="pool-stage-head">
               <div className="stage-head-title">
                 <h2 className="stage-name">{stage.name}</h2>
                 {stage.projectedStarRating != null && (
@@ -210,14 +197,7 @@ export default function PoolPage({
             </div>
 
             {stage.categories.map((cat) => (
-              <div
-                key={cat.id}
-                style={{
-                  borderTop: "1px solid var(--paper-line)",
-                  paddingTop: "0.5rem",
-                  paddingBottom: "0.5rem",
-                }}
-              >
+              <div key={cat.id} className="pool-category-block">
                 <p className="category-name">
                   {modAccentColor(cat.slots[0]?.code ?? "") && (
                     <span
@@ -233,7 +213,9 @@ export default function PoolPage({
                   <div key={slot.id}>
                     <div className="slot-line">
                       <div
-                        className="slot-row slot-row--editable"
+                        className={`slot-row slot-row--editable${
+                          slotImporting[slot.id] ? " slot-row--loading" : ""
+                        }`}
                         style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
                       >
                         <span className={`slot-code${hasCover ? " slot-chip" : ""}`}>
@@ -287,7 +269,11 @@ export default function PoolPage({
                               title="Import & assign"
                               aria-label={`Import and assign beatmap to slot ${slot.code}`}
                             >
-                              {slotImporting[slot.id] ? "…" : "✓"}
+                              {slotImporting[slot.id] ? (
+                                <span className="spinner" aria-hidden="true" />
+                              ) : (
+                                "✓"
+                              )}
                             </button>
                           </>
                         )}
@@ -305,7 +291,7 @@ export default function PoolPage({
         ))}
       </div>
 
-      {pendingSlotIds.length > 0 && (
+      {(pendingSlotIds.length > 0 || applyingAll) && (
         <div className="pool-apply-all">
           <button
             className="btn btn-ghost"
@@ -313,7 +299,13 @@ export default function PoolPage({
             disabled={applyingAll}
             title="Import & assign all pasted beatmaps"
           >
-            {applyingAll ? "Applying…" : `Apply All (${pendingSlotIds.length})`}
+            {applyingAll ? (
+              <>
+                <span className="spinner" aria-hidden="true" /> Importing…
+              </>
+            ) : (
+              `Import All (${pendingSlotIds.length})`
+            )}
           </button>
         </div>
       )}
@@ -336,6 +328,17 @@ export default function PoolPage({
           {running ? "Running Analysis…" : "Run Analysis →"}
         </button>
       </div>
+
+      {(applyingAll || singleImportInFlight) && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <span className="spinner spinner--lg" aria-hidden="true" />
+          <span className="loading-overlay-text">
+            {applyingAll
+              ? `Importing ${applyingTotal} beatmap${applyingTotal === 1 ? "" : "s"}…`
+              : "Importing beatmap…"}
+          </span>
+        </div>
+      )}
     </main>
   );
 }

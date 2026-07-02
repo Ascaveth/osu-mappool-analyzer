@@ -27,7 +27,11 @@ export function StageSection({
   const slotCount = stage.categories.reduce((s, c) => s + c.slots.length, 0);
 
   return (
-    <section className="stage reveal" style={{ animationDelay: `${delay}ms` }}>
+    <section
+      id={`stage-${stage.id}`}
+      className="stage reveal"
+      style={{ animationDelay: `${delay}ms`, scrollMarginTop: "4.5rem" }}
+    >
       <div className="stage-head">
         <div>
           <div className="stage-head-title">

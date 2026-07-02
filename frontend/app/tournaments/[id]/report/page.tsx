@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Masthead } from "@/components/Masthead";
 import { ThesisHero } from "@/components/ThesisHero";
 import { StageSection } from "@/components/StageSection";
+import { StageNav } from "@/components/StageNav";
 import { MarginNote } from "@/components/MarginNote";
 import type { Tournament, Report, Citation } from "@/lib/types";
 
@@ -45,15 +46,10 @@ export default function ReportPage({
   if (error) {
     return (
       <main className="programme">
-        <p
-          style={{
-            color: "var(--mark)",
-            fontFamily: "var(--font-data)",
-            fontSize: "0.875rem",
-          }}
-        >
-          Error: {error}
-        </p>
+        <div className="alert" role="alert">
+          <span className="alert-icon" aria-hidden="true">▲</span>
+          <p className="alert-text">Error: {error}</p>
+        </div>
         <Link
           href="/"
           style={{
@@ -133,6 +129,7 @@ export default function ReportPage({
       </div>
 
       <Masthead tournament={tournament} report={report} />
+      <StageNav stages={tournament.stages} />
       <ThesisHero sections={report.sections} />
 
       {tournamentWideNotes.length > 0 && (
@@ -154,7 +151,7 @@ export default function ReportPage({
         />
       ))}
 
-      <p className="colophon">
+      <p className="footer-note">
         ⁂ End of report · {tournament.name}
         {tournament.edition ? ` ${tournament.edition}` : ""}
       </p>

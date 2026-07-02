@@ -1,19 +1,13 @@
 import Link from "next/link";
-import { MarginNote } from "@/components/MarginNote";
-import { report as sampleReport } from "@/lib/sample-data";
-
-const ro16Findings = sampleReport.sections.findings.filter(
-  (c) =>
-    (c.scope.type === "stage" && c.scope.id === "stage-ro16") ||
-    (c.scope.type === "tournament" && c.finding.targetStageId === "stage-ro16"),
-);
+import { HowToUse } from "@/components/HowToUse";
+import { WipDisclaimer } from "@/components/WipDisclaimer";
 
 export default function Home() {
   return (
     <main className="programme">
       <div className="masthead">
         <h1 className="masthead-title">osu! Mappool Analyzer</h1>
-        <h2 className="masthead-eyebrow">Ngakak abis Boss</h2>
+        <h2 className="masthead-eyebrow">Tournament mappool analysis</h2>
       </div>
 
       <p
@@ -27,32 +21,25 @@ export default function Home() {
           color: "var(--ink-soft)",
         }}
       >
-        Why need to testplay if you can use an automated mappool analyzer?
+        Ready to flame the #mappool-feedback channel?
       </p>
 
-      <section className="exhibit reveal" style={{ animationDelay: "100ms" }}>
-        <div className="exhibit-head">
-          <h2 className="stage-name">Round of 16</h2>
-        </div>
-        <div className="exhibit-notes">
-          {ro16Findings.map((c) => (
-            <MarginNote key={`${c.analyzerName}-${c.scope.type}-${c.scope.id}`} citation={c} />
-          ))}
-        </div>
-        <p className="exhibit-caption">
-          {ro16Findings.length} finding{ro16Findings.length === 1 ? "" : "s"} from a generated analysis, Ascaveth Invitational Tournament 2023
-        </p>
-      </section>
+      <HowToUse />
 
       <Link href="/tournaments/new" className="btn btn-primary">
         Analyze a Mappool →
       </Link>
 
+      <WipDisclaimer />
+
       <p
-        className="colophon"
+        className="footer-note"
         style={{ marginTop: "4rem", borderTop: "1px solid var(--paper-line)", paddingTop: "1.5rem" }}
       >
-        Demo mode · Full analysis requires the backend server
+        Alpha state
+        <span className="footer-note-detail">
+          This is an early build — features may change or break.
+        </span>
       </p>
     </main>
   );
