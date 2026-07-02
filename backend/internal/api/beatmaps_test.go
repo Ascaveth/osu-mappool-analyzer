@@ -2,13 +2,26 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
+
+// failingEnricher always returns an error, so tests can assert that
+// enrichment failure never fails the import HTTP response.
+type failingEnricher struct{ called bool }
+
+func (f *failingEnricher) Enrich(_ context.Context, _ *domain.Beatmap, _ []byte) error {
+	f.called = true
+	return errors.New("osu! API unreachable")
+}
 
 func importTestBeatmap(t *testing.T, s *Server, path string) beatmapDTO {
 	t.Helper()
@@ -92,6 +105,21 @@ func TestImportBeatmap_MissingFile(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestImportBeatmap_EnrichmentFailureDoesNotFailImport(t *testing.T) {
+	s := newTestServer()
+	enricher := &failingEnricher{}
+	s.Enricher = enricher
+
+	dto := importTestBeatmap(t, s, "../osufile/testdata/sample.osu")
+
+	if dto.ID == "" {
+		t.Error("expected import to succeed despite enrichment failure")
+	}
+	if !enricher.called {
+		t.Error("expected Enricher.Enrich to be called")
 	}
 }
 

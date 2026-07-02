@@ -78,6 +78,18 @@ type Beatmap struct {
 	// OsuFileHash is a content hash (sha256) of the source .osu file, used
 	// to deduplicate re-imports of the same beatmap (docs/06-domain-model.md
 	// domain rules: re-importing an identical file must resolve to the
-	// existing Beatmap, not create a duplicate).
+	// existing Beatmap, not create a duplicate). Distinct from OsuBeatmapID
+	// (osu!'s own numeric identifier) and from osu!'s own per-difficulty MD5
+	// checksum (used only to query the osu! API's checksum-lookup endpoint,
+	// never stored) — three different identifiers with different purposes.
 	OsuFileHash string
+
+	// OsuBeatmapID is osu!'s own numeric beatmap ID, used to query the
+	// osu! API v2 for official Star Rating (see internal/osuapi,
+	// internal/enrich). Nil when unknown: either the source .osu file's
+	// [Metadata] BeatmapID field was absent/unparseable at import time, or
+	// (for a locally-authored/never-submitted map) no such ID exists at
+	// all. A nil value is a permanent, expected state for some beatmaps,
+	// not an error.
+	OsuBeatmapID *int64
 }
