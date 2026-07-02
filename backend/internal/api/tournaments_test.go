@@ -204,7 +204,9 @@ func TestCreateTournament_ProjectedStarRatingRoundTrips(t *testing.T) {
 	getRec := httptest.NewRecorder()
 	NewRouter(s).ServeHTTP(getRec, getReq)
 	var refetched tournamentDTO
-	json.NewDecoder(getRec.Body).Decode(&refetched)
+	if err := json.NewDecoder(getRec.Body).Decode(&refetched); err != nil {
+		t.Fatalf("decoding refetch response: %v", err)
+	}
 	if refetched.Stages[0].ProjectedStarRating == nil || *refetched.Stages[0].ProjectedStarRating != 5.5 {
 		t.Errorf("after GET, ProjectedStarRating = %v, want 5.5", refetched.Stages[0].ProjectedStarRating)
 	}
@@ -233,7 +235,9 @@ func TestCreateTournament_ProjectedStarRatingFallsBackToNM1(t *testing.T) {
 	getRec := httptest.NewRecorder()
 	NewRouter(s).ServeHTTP(getRec, getReq)
 	var refetched tournamentDTO
-	json.NewDecoder(getRec.Body).Decode(&refetched)
+	if err := json.NewDecoder(getRec.Body).Decode(&refetched); err != nil {
+		t.Fatalf("decoding refetch response: %v", err)
+	}
 	if got := refetched.Stages[0].ProjectedStarRating; got == nil || *got != bm.StarRating {
 		t.Errorf("ProjectedStarRating = %v, want NM1 beatmap's StarRating (%v)", got, bm.StarRating)
 	}
