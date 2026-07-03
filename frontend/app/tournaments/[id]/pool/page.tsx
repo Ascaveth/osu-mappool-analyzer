@@ -172,7 +172,7 @@ export default function PoolPage({
           {tournament.name}
           {tournament.edition ? ` ${tournament.edition}` : ""}
         </p>
-        <h1 className="masthead-title">Pool Builder</h1>
+        <h1 className="masthead-title">Import Beatmaps</h1>
       </div>
 
       {error && (

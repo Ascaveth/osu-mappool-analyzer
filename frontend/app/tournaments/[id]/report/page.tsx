@@ -124,7 +124,7 @@ export default function ReportPage({
             textDecoration: "none",
           }}
         >
-          ← Pool Builder
+          ← Import Beatmaps
         </Link>
       </div>
 
