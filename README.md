@@ -1,11 +1,3 @@
-<a id="readme-top"></a>
-
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-
 <br />
 <div align="center">
   <a href="https://github.com/Ascaveth/osu-mappool-analyzer">
@@ -182,8 +174,8 @@ That's what CI runs (`.github/workflows/backend-tests.yml`). The frontend has no
 ## Roadmap
 
 - [ ] Postgres persistence layer (storage is in-memory only right now)
-- [ ] Frontend test suite
-- [ ] Additional analyzers beyond the current tournament/metadata/pattern set
+- [ ] Sharpens the analyzer backend so it can give a better analysis report for the inputted mappools
+- [ ] Imports from the Mappool Google Sheets (usually a tournament uploads their mappools list on the Google Sheets)
 
 See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) for the full list of proposed features and known gaps.
 
@@ -235,16 +227,6 @@ Questions or ideas: [open an issue](https://github.com/Ascaveth/osu-mappool-anal
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/Ascaveth/osu-mappool-analyzer.svg?style=for-the-badge
-[contributors-url]: https://github.com/Ascaveth/osu-mappool-analyzer/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/Ascaveth/osu-mappool-analyzer.svg?style=for-the-badge
-[forks-url]: https://github.com/Ascaveth/osu-mappool-analyzer/network/members
-[stars-shield]: https://img.shields.io/github/stars/Ascaveth/osu-mappool-analyzer.svg?style=for-the-badge
-[stars-url]: https://github.com/Ascaveth/osu-mappool-analyzer/stargazers
-[issues-shield]: https://img.shields.io/github/issues/Ascaveth/osu-mappool-analyzer.svg?style=for-the-badge
-[issues-url]: https://github.com/Ascaveth/osu-mappool-analyzer/issues
-[license-shield]: https://img.shields.io/github/license/Ascaveth/osu-mappool-analyzer.svg?style=for-the-badge
-[license-url]: https://github.com/Ascaveth/osu-mappool-analyzer/blob/main/LICENSE
 [Go.dev]: https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white
 [Go-url]: https://go.dev/
 [Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
