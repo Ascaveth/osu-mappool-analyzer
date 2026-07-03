@@ -57,9 +57,9 @@
 
 ## About The Project
 
-Feed it a tournament's stages and beatmaps, and it runs a set of analyzers over the pool — composition, progression, balance, diversity — the things a mappooler actually needs to sanity-check before a pool goes live.
+Feed it a tournament's stages and beatmaps, and it runs a set of analyzers over the pool. The things a mappooler actually needs to sanity-check before a pool goes live.
 
-This isn't a player stats site, and it's not another leaderboard clone. The pool itself is the subject.
+This isn't a player stats site, and it's not another leaderboard clone. The mappools itself is the subject.
 
 Two pieces, wired together:
 
