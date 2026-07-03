@@ -50,7 +50,7 @@ Classifies runs of circles whose inter-onset interval is at or below **1/4 beat 
 
 - `JumpDistanceAnalyzer`: distance computation, spinner exclusion, fewer-than-two-object edge case.
 - `JumpAngleAnalyzer`: a known right-angle case (asserted to ~90°), stacked-note skip behavior.
-- `StreamBurstAnalyzer`: stream detection (8 notes), burst detection (4 notes), widely-spaced notes producing no runs, zero-BPM safety (no panic, no division by zero).
+- `StreamBurstAnalyzer`: stream detection (8 notes), burst detection (4 notes), widely-spaced notes producing no runs, local-timing-point BPM taking precedence over the beatmap's global dominant BPM, zero-BPM safety (no panic, no division by zero).
 - `SliderComplexityAnalyzer` / `SpinnerUsageAnalyzer`: metric computation plus their respective malformed-data finding conditions, and empty-object-list edge cases.
 - An integration test running all five analyzers through a real `analysis.Engine` together.
 

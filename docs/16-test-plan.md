@@ -6,32 +6,43 @@ Phase 12 deliverable: how the project verifies analyzer correctness (`pool-lab-p
 
 ```
         ▲
-        │   1 integration test (internal/integration)
-        │   parse -> normalize -> analyze -> report, one real run
+        │   2 integration tests (internal/integration)
+        │   parse -> normalize -> analyze -> report, one real run;
+        │   plus internal/api's HTTP-level integration test
         │
-        │   57+ unit tests, one package per pipeline stage
-        │   (osufile, normalize, domain, analysis/*, report, storage)
+        │   150+ unit tests, one package per pipeline stage
+        │   (osufile, normalize, domain, config, modmap, osuapi,
+        │    enrich, analysis/*, report, api, storage)
         ▼
 ```
 
-This is unit-heavy by design, not by neglect. Every analyzer is a pure function over a `domain.Tournament`/`domain.Beatmap` (Architecture Principle 6: determinism; Principle 11: analyzer independence) — there's no I/O, no network, no shared mutable state inside an analyzer to require heavier test machinery. A small number of integration tests exist purely to prove the *wiring* between stages, not to re-verify logic the unit tests already cover. There is no end-to-end (E2E) layer (browser, running server) yet, because there is no running server or live-data frontend yet (see "Not in scope," below) — that layer gets added when one exists, not before.
+This is unit-heavy by design, not by neglect. Every analyzer is a pure function over a `domain.Tournament`/`domain.Beatmap` (Architecture Principle 6: determinism; Principle 11: analyzer independence) — there's no I/O, no network, no shared mutable state inside an analyzer to require heavier test machinery. A small number of integration tests exist purely to prove the *wiring* between stages, not to re-verify logic the unit tests already cover. `internal/api`'s tests are the one deliberate exception, since HTTP handler wiring genuinely needs `httptest` rather than a synthetic `domain.Tournament` call. There is still no browser-level E2E layer, because the frontend has no automated tests yet (see "Not in scope," below) — that layer gets added when one exists, not before.
 
 ## Coverage table
 
+All packages pass (`go test ./...`, captured 2026-07-02). This table lists every package `go test ./... -cover` reports, including packages with no statements to cover and test-only helper packages.
+
 | Package | Test file(s) | Tests | Coverage | Covers |
 |---|---|---|---|---|
-| `internal/osufile` | `parser_test.go` | 8 | 88.6% | `.osu` parsing: happy path, malformed input, empty input, BOM tolerance, malformed-line skipping, slider curves + inherited timing points, extreme values (high BPM, dense objects), missing `[TimingPoints]` section |
-| `internal/normalize` | `beatmap_test.go` | 7 | 91.0% | Raw → `domain.Beatmap`: metadata/difficulty extraction, slider duration math, dominant-BPM selection, missing required fields, extreme-value passthrough (no clamping), missing-timing-points fallback, empty-beatmap edge case |
-| `internal/domain` | `configuration_test.go` | 7 | 100% | `ValidateConfiguration`: happy path, parallel same-order stages (not an error — see "Findings from this phase" below), duplicate category order (error), zero-slot category (error), duplicate category name within a stage (warning, not error), duplicate names across different stages (not flagged) |
-| `internal/analysis` | `engine_test.go` | 5 | 70.6% | Plugin contract: independent analyzers run across all matching scopes, beatmap dedup by ID, required-Finding-fields enforcement, one analyzer's failure doesn't block others, duplicate-name registration rejected, deterministic `SourceHash` |
+| `internal/osufile` | `parser_test.go` | 10 | 85.6% | `.osu` parsing: happy path, malformed input, empty input, BOM tolerance, malformed-line skipping, slider curves + inherited timing points, extreme values (high BPM, dense objects), missing `[TimingPoints]` section |
+| `internal/normalize` | `beatmap_test.go` | 11 | 91.6% | Raw → `domain.Beatmap`: metadata/difficulty extraction, slider duration math, dominant-BPM selection, missing required fields, extreme-value passthrough (no clamping), missing-timing-points fallback, empty-beatmap edge case |
+| `internal/domain` | `configuration_test.go` | 8 | 100% | `ValidateConfiguration`: happy path, parallel same-order stages (not an error — see "Findings from this phase" below), duplicate category order (error), zero-slot category (error), duplicate category name within a stage (warning, not error), duplicate names across different stages (not flagged) |
+| `internal/config` | `config_test.go` | 1 (table-driven, 4 cases) | 66.7% | `Load()`: both env vars unset, both set, one-set/one-missing (error), default `PORT`/`ALLOWED_ORIGINS` — see [docs/18](18-configuration-and-modmap.md) |
+| `internal/modmap` | `modmap_test.go` | 4 | 95.2% | `FromCategoryName` single/combo/unresolvable resolution, `IsFreeMod`, `FreeModCandidates` excludes DoubleTime, `AffectsStarRating` — see [docs/18](18-configuration-and-modmap.md) |
+| `internal/osuapi` | `client_test.go` | 5 | 80.5% | osu! API HTTP client: OAuth token fetch/reuse, Star Rating fetch by beatmap+mods, checksum lookup, error propagation |
+| `internal/osuapi/osuapitest` | — (test helper, no `_test.go`) | — | 0.0% (no test statements; it *is* the test double) | `FakeClient` used by `internal/enrich`'s tests |
+| `internal/enrich` | `starrating_test.go` | 5 | 92.3% | Import-time Star Rating enrichment orchestration: ID resolution (parsed vs. checksum-lookup fallback), eager mod-combo fetch, partial-failure tolerance, total-failure error path |
+| `internal/analysis` | `engine_test.go` | 5 | 71.4% | Plugin contract: independent analyzers run across all matching scopes, beatmap dedup by ID, required-Finding-fields enforcement, one analyzer's failure doesn't block others, duplicate-name registration rejected, deterministic `SourceHash` |
 | `internal/analysis/metadata` | `metadata_test.go` | 10 | 93.3% | Mapper/BPM diversity and uniformity detection, dedup, boundary values |
-| `internal/analysis/pattern` | `pattern_test.go` | 14 | 95.9% | Jump distance/angle, flow consistency, object density, density anomalies, cursor travel, tech factor |
-| `internal/analysis/tournament` | `tournament_test.go` | 11 | 90.2% | Composition (category dominance), Progression (difficulty spikes), Balance, Diversity |
+| `internal/analysis/pattern` | `pattern_test.go`, `skillset_test.go` | 20 | 93.7% | Jump distance/angle, stream/burst detection, slider complexity, spinner usage, and `ComputeSkillsetProfile`'s shared skillset-classification primitives — see [docs/11](11-pattern-analyzers.md) for the exact metric set (there is no separate "flow consistency"/"cursor travel"/"tech factor" concept in this package; an earlier version of this table implied there was) |
+| `internal/analysis/tournament` | `tournament_test.go`, `difficulty_spread_test.go` | 28 | 91.0% | Composition (category dominance), Progression (difficulty spikes), Balance, Diversity, Skill Coverage, Difficulty Spread (gap/spike detection, FreeMod ranging) |
 | `internal/report` | `report_test.go` | 4 | 94.2% | Summary narration, citation/counting, severity weighting, statistics aggregation |
-| `internal/storage` | — (contract lives in `storagetest`) | — | n/a | Interface only; see below |
+| `internal/api` | `api_integration_test.go`, `beatmaps_test.go`, `testhelpers_test.go`, `tournaments_test.go` | 22 | 64.1% | HTTP handlers: tournament/beatmap CRUD, import + enrichment wiring, CORS/logging middleware, end-to-end request/response contract |
+| `internal/storage` | — (contract lives in `storagetest`) | — | n/a (interface only) | Interface only; see below |
 | `internal/storage/storagetest` | `beatmap_repository.go` | 6 subtests | n/a (helper) | Reusable `BeatmapRepository` contract: save/find by ID and hash, dedup by hash, not-found errors, record isolation |
-| `internal/storage/memory` | `beatmap_repository_test.go` | 1 (runs the contract) | 100% | In-memory repository against the shared contract above |
-| `internal/integration` | `pipeline_test.go` | 2 | n/a (cross-package) | Full pipeline composition (parse → normalize → analyze → report) against real `.osu` fixtures; invalid-configuration short-circuit before analysis runs |
+| `internal/storage/memory` | `beatmap_repository_test.go`, `star_rating_repository_test.go`, `tournament_repository_test.go` | 13 | 82.2% | In-memory `BeatmapRepository` against the shared contract above, plus `StarRatingRepository` and `TournamentRepository` implementations |
+| `internal/integration` | `pipeline_test.go` | 2 | [no statements] | Full pipeline composition (parse → normalize → analyze → report) against real `.osu` fixtures; invalid-configuration short-circuit before analysis runs |
+| `cmd/server` | — (composition root, no `_test.go`) | — | 0.0% | Wiring only (see [docs/18](18-configuration-and-modmap.md)); exercised indirectly via `internal/api` and `internal/integration` |
 
 Run locally: `cd backend && go test ./... -cover`. Run with verbose per-test output: add `-v`.
 
@@ -65,9 +76,9 @@ No regression-specific fixtures exist yet because no bug has been found and fixe
 
 ## What is explicitly not in scope for this phase
 
-- **Live API contract tests.** Phase 10 validated `docs/api/openapi.yaml` with `@redocly/cli lint` and a Prism mock server, but there is no running server implementation (`docs/14-api-specification.md`'s scope note — no `TournamentRepository`/HTTP handlers exist). Contract tests against a real server are blocked on that server existing; add them when it does.
-- **Frontend automated tests.** `frontend/` (Phase 11) renders `lib/sample-data.ts`, not live data — there's no real behavior to test yet beyond "does static sample data render," which a snapshot test would only encode as a brittle copy of the fixture. Add a real test suite (component tests against actual API responses, at minimum) once the frontend fetches from a running backend.
-- **Load/performance testing.** Not called for by Phase 12's task list, and there's no deployed system yet to load-test.
+- **Frontend automated tests.** The frontend now fetches live data from the real API (`frontend/lib/api/rest.ts` — see [docs/15](15-ui-specification.md#backend-wiring)), so this gap is no longer "nothing real to test yet" — it's a genuine, un-backfilled hole. No `*.test.*`/`*.spec.*` files exist anywhere under `frontend/`. Add a real test suite (component tests against actual/mocked API responses, at minimum for the wizard's validation logic and the pool builder's import flow) as a follow-up.
+- **Contract tests against a Postgres-backed implementation.** `internal/api`'s integration tests already exercise the real HTTP handlers end to end (see the coverage table above) against the current in-memory storage — that gap closed. What remains is verifying the same contract holds once `internal/storage/postgres` exists (see [docs/14](14-api-specification.md#storage)); blocked on that implementation, not on test design.
+- **Load/performance testing.** Not called for by any shipped phase's task list, and there's no deployed system yet to load-test.
 
 ## Testing checklist (for future analyzers)
 

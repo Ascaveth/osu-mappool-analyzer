@@ -56,3 +56,15 @@ Sufficient for the project's current scale (no indication of needing orchestrati
 ## Open question for the user
 
 Confirm or override this before Phase 4 (Import Pipeline) begins, since that's the first phase that produces real backend code.
+
+## Current Implementation Status
+
+This section reflects what is actually running today, not the target. It will drift as phases land — check the codebase, not just this note, when precision matters.
+
+- **Backend: Go.** Implemented as proposed (`backend/`).
+- **Database: PostgreSQL.** Not yet implemented. Storage is in-memory only (`backend/internal/storage/memory/`); no SQL migrations or Postgres-backed repository exist anywhere in the repo. The `storage.BeatmapRepository`/`storage.TournamentRepository` interfaces are in place per [08-beatmap-import-pipeline.md](08-beatmap-import-pipeline.md), so a Postgres implementation remains a drop-in addition, not a redesign.
+- **Cache: Redis.** Not implemented, as planned (deferred).
+- **Frontend: Next.js / TS / Tailwind / shadcn.** Implemented.
+- **Deployment: Docker Compose.** Not yet verified as part of this pass.
+
+The PostgreSQL/Redis recommendation above remains the target — this note does not supersede it, only records that the target hasn't been built yet.
