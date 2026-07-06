@@ -40,6 +40,7 @@ func beatmapPlacements(t *domain.Tournament, beatmapID string) []modPlacement {
 				if mods, ok := modmap.FromCategoryName(c.Name); ok {
 					placements = append(placements, modPlacement{categoryName: c.Name, mods: mods})
 				}
+				break // one placement per Category, even if the beatmap fills multiple its slots
 			}
 		}
 	}
