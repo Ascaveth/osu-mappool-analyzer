@@ -342,6 +342,67 @@ func TestDiversityAnalyzer_DistinctSongsProduceNoFindings(t *testing.T) {
 	}
 }
 
+func TestDiversityAnalyzer_FlagsClusteredBPM(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 180))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 185))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 190))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["bpm_range"]; got != 10 {
+		t.Errorf("bpm_range = %v, want 10 (190-180)", got)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a BPM-clustering finding (10 BPM range across 3 filled slots)")
+	}
+}
+
+func TestDiversityAnalyzer_SpreadBPMAcrossStageProducesNoClusterFinding(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 120))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 180))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 240))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			t.Error("did not expect a BPM-clustering finding (120 BPM range across 3 filled slots)")
+		}
+	}
+}
+
 // --- SkillCoverageAnalyzer ---
 
 func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
@@ -525,12 +586,163 @@ func TestSkillCoverageAnalyzer_NoFilledSlotsDoesNotPanic(t *testing.T) {
 	}
 }
 
+// --- SkillRedundancyAnalyzer ---
+
+func TestSkillRedundancyAnalyzer_FlagsNearIdenticalProfiles(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
+				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", jumpBeatmap("bm2"))}},
+				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", streamBeatmap("bm3"))}},
+			},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["filled_slots"]; got != 3 {
+		t.Errorf("filled_slots = %v, want 3", got)
+	}
+	if got := result.Metrics["redundant_pair_count"]; got != 1 {
+		t.Errorf("redundant_pair_count = %v, want 1 (bm1/bm2 are identical jump beatmaps)", got)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "s1") && strings.Contains(f.Description, "s2") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a redundancy finding pairing s1 and s2 (both jumpBeatmap)")
+	}
+}
+
+func TestSkillRedundancyAnalyzer_DiverseProfilesProduceNoFindings(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
+				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", streamBeatmap("bm2"))}},
+				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", unclassifiedBeatmap("bm3"))}},
+			},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0, got: %+v", len(result.Findings), result.Findings)
+	}
+}
+
+func TestSkillRedundancyAnalyzer_AllIdenticalDimensionsDoesNotPanic(t *testing.T) {
+	// Every beatmap is identical on every dimension (a single unclassified
+	// circle each): min-max range is 0 for every dimension, which must not
+	// divide by zero.
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", unclassifiedBeatmap("bm1")),
+					slot("s2", unclassifiedBeatmap("bm2")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["closest_pair_distance"]; got != 0 {
+		t.Errorf("closest_pair_distance = %v, want 0 (identical profiles)", got)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 (identical profiles are maximally redundant)", len(result.Findings))
+	}
+}
+
+func TestSkillRedundancyAnalyzer_TooFewSlotsDoesNotPanic(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
+	}
+	if got := result.Metrics["filled_slots"]; got != 1 {
+		t.Errorf("filled_slots = %v, want 1", got)
+	}
+}
+
+func TestSkillRedundancyAnalyzer_CapsFindingsAtMaxRedundancyFindings(t *testing.T) {
+	var categories []domain.Category
+	// 8 identical jump beatmaps -> C(8,2) = 28 redundant pairs, all
+	// distance 0, must be capped at maxRedundancyFindings.
+	for i := 0; i < 8; i++ {
+		id := stageID(i)
+		categories = append(categories, domain.Category{
+			ID: "cat-" + id, Order: i + 1,
+			Slots: []domain.Slot{slot("s-"+id, jumpBeatmap("bm-"+id))},
+		})
+	}
+	tournament := &domain.Tournament{
+		ID:     "t-1",
+		Stages: []domain.Stage{{ID: "stage-1", Order: 1, Categories: categories}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["redundant_pair_count"]; got != 28 {
+		t.Errorf("redundant_pair_count = %v, want 28", got)
+	}
+	if len(result.Findings) != maxRedundancyFindings {
+		t.Errorf("len(Findings) = %d, want %d (capped)", len(result.Findings), maxRedundancyFindings)
+	}
+}
+
 // --- Integration ---
 
 func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 	e := analysis.NewEngine()
 	for _, a := range []analysis.Analyzer{
-		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{}, SkillCoverageAnalyzer{},
+		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{}, SkillCoverageAnalyzer{}, SkillRedundancyAnalyzer{},
 	} {
 		if err := e.Register(a); err != nil {
 			t.Fatalf("Register(%s): %v", a.Name(), err)
@@ -544,9 +756,9 @@ func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	// 1 tournament-scoped + 3 stage-scoped (Composition) + 3 stage-scoped
-	// (Diversity) + 3 stage-scoped (SkillCoverage) + 3 category-scoped
-	// (Balance) = 13.
-	if len(results) != 13 {
-		t.Errorf("len(results) = %d, want 13", len(results))
+	// (Diversity) + 3 stage-scoped (SkillCoverage) + 3 stage-scoped
+	// (SkillRedundancy) + 3 category-scoped (Balance) = 16.
+	if len(results) != 16 {
+		t.Errorf("len(results) = %d, want 16", len(results))
 	}
 }
