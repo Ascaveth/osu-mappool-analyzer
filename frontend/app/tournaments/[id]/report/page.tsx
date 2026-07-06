@@ -7,8 +7,21 @@ import { Masthead } from "@/components/Masthead";
 import { ThesisHero } from "@/components/ThesisHero";
 import { StageSection } from "@/components/StageSection";
 import { StageNav } from "@/components/StageNav";
-import { MarginNote } from "@/components/MarginNote";
+import { FindingsSummary } from "@/components/FindingsSummary";
 import type { Tournament, Report, Citation } from "@/lib/types";
+
+// Analyzers can independently flag the same underlying issue for the same
+// scope; collapse those into a single citation so the report doesn't show
+// the same finding twice.
+function dedupeCitations(citations: Citation[]): Citation[] {
+  const seen = new Set<string>();
+  return citations.filter((c) => {
+    const key = `${c.analyzerName}|${c.scope.type}|${c.scope.id}|${c.finding.description}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export default function ReportPage({
   params,
@@ -74,41 +87,31 @@ export default function ReportPage({
     );
   }
 
-  const { findings } = report.sections;
+  const findings = dedupeCitations(report.sections.findings);
 
-  const stageNotes = (stageId: string): Citation[] =>
-    findings.filter(
-      (c) =>
-        (c.scope.type === "stage" && c.scope.id === stageId) ||
-        (c.scope.type === "tournament" && c.finding.targetStageId === stageId),
-    );
-
-  const categoryNotesFor = (stage: (typeof tournament.stages)[number]) =>
-    Object.fromEntries(
-      stage.categories.map((cat) => [
-        cat.id,
-        findings.filter(
-          (c) => c.scope.type === "category" && c.scope.id === cat.id,
-        ),
-      ]),
-    );
-
-  const beatmapNotesFor = (stage: (typeof tournament.stages)[number]) =>
-    Object.fromEntries(
-      stage.categories
-        .flatMap((cat) => cat.slots)
-        .filter((s) => s.beatmap !== null)
-        .map((s) => [
-          s.beatmap!.id,
-          findings.filter(
-            (c) => c.scope.type === "beatmap" && c.scope.id === s.beatmap!.id,
-          ),
-        ]),
-    );
-
-  const tournamentWideNotes = findings.filter(
-    (c) => c.scope.type === "tournament" && !c.finding.targetStageId,
+  // Headline findings: shown as one severity-grouped block right below the
+  // results line. Category/beatmap-scoped findings render separately,
+  // inline at the bottom of their category block (see StageSection).
+  const headlineFindings = findings.filter(
+    (c) => c.scope.type === "tournament" || c.scope.type === "stage",
   );
+
+  const categoryNotesFor = (stage: Tournament["stages"][number]) =>
+    Object.fromEntries(
+      stage.categories.map((cat) => {
+        const beatmapIds = new Set(
+          cat.slots.filter((s) => s.beatmap !== null).map((s) => s.beatmap!.id),
+        );
+        return [
+          cat.id,
+          findings.filter(
+            (c) =>
+              (c.scope.type === "category" && c.scope.id === cat.id) ||
+              (c.scope.type === "beatmap" && beatmapIds.has(c.scope.id)),
+          ),
+        ];
+      }),
+    );
 
   return (
     <main className="programme">
@@ -131,22 +134,13 @@ export default function ReportPage({
       <Masthead tournament={tournament} report={report} />
       <StageNav stages={tournament.stages} />
       <ThesisHero sections={report.sections} />
-
-      {tournamentWideNotes.length > 0 && (
-        <div className="marginalia">
-          {tournamentWideNotes.map((c, i) => (
-            <MarginNote key={i} citation={c} />
-          ))}
-        </div>
-      )}
+      <FindingsSummary citations={headlineFindings} tournament={tournament} />
 
       {tournament.stages.map((stage, i) => (
         <StageSection
           key={stage.id}
           stage={stage}
-          stageNotes={stageNotes(stage.id)}
           categoryNotes={categoryNotesFor(stage)}
-          beatmapNotes={beatmapNotesFor(stage)}
           delay={160 + i * 90}
         />
       ))}

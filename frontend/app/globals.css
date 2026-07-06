@@ -133,6 +133,7 @@ body {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-soft);
+  margin-bottom: 0.85rem;
 }
 
 .masthead-title {
@@ -141,7 +142,7 @@ body {
   font-size: clamp(2.25rem, 5vw, 3.5rem);
   line-height: 1.05;
   letter-spacing: -0.01em;
-  margin-top: 0.4rem;
+  margin-top: 0;
 }
 
 .masthead-title em {
@@ -169,6 +170,41 @@ body {
   font-weight: 600;
   font-size: clamp(1.125rem, 2vw, 1.375rem);
   letter-spacing: -0.005em;
+}
+
+/* === Findings summary: all analyzer findings in one place, grouped by
+   severity, instead of scattered in a right-side rail next to content. === */
+
+.findings-summary {
+  margin-bottom: 3rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper) 96%, var(--ink) 4%);
+}
+
+.findings-summary-group + .findings-summary-group {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px dashed var(--paper-line);
+}
+
+.findings-summary-heading {
+  font-family: var(--font-data), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.6rem;
+}
+
+.findings-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 /* Small disclaimer note: quieter than .footer-note (page-level), sits right
@@ -234,10 +270,6 @@ body {
 }
 
 .stage-head {
-  display: grid;
-  grid-template-columns: 1fr minmax(200px, 240px);
-  gap: 1.5rem;
-  align-items: start;
   border-top: 1px solid var(--ink);
   padding-top: 0.85rem;
   margin-bottom: 0.75rem;
@@ -265,12 +297,21 @@ body {
 }
 
 .category-block {
-  display: grid;
-  grid-template-columns: 1fr minmax(200px, 240px);
-  gap: 1.5rem;
-  align-items: start;
   padding: 0.6rem 0;
   border-top: 1px solid var(--paper-line);
+}
+
+/* Supporting detail for a category's own maps — quieter than
+   .findings-summary (no border box) since it's a footnote to the slots
+   above it, not the report's headline analysis. */
+.category-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  padding-left: 1rem;
+  border-top: 1px dashed var(--paper-line);
 }
 
 .category-name {
@@ -415,14 +456,6 @@ body {
   margin-left: auto;
 }
 
-.marginalia {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding-left: 1.25rem;
-  border-left: 1px solid var(--paper-line);
-}
-
 .note {
   display: flex;
   gap: 0.5em;
@@ -503,19 +536,6 @@ body {
   color: var(--ink-soft);
 }
 
-@media (max-width: 720px) {
-  .stage-head,
-  .category-block {
-    grid-template-columns: 1fr;
-  }
-  .marginalia {
-    border-left: none;
-    border-top: 1px dashed var(--paper-line);
-    padding-left: 0;
-    padding-top: 0.75rem;
-    margin-top: 0.25rem;
-  }
-}
 
 /* === Page-load reveal: the engine "typing down" the page === */
 

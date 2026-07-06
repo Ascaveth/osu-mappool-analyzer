@@ -260,9 +260,10 @@ export default function NewTournamentPage() {
                       className="field-input"
                       type="text"
                       inputMode="decimal"
+                      placeholder="e.g. 6.75"
                       aria-label="Projected star rating for this stage (optional)"
                       aria-invalid={!isValidStarRating(stage.projectedStarRating)}
-                      title="Optional target Star Rating (e.g. 6.75) — defaults to this stage's NM1 beatmap once one is assigned"
+                      title="Optional target Star Rating. Defaults to this stage's NM1 beatmap once one is assigned."
                       value={stage.projectedStarRating}
                       onChange={(e) => {
                         const normalized = normalizeStarRatingInput(e.target.value);

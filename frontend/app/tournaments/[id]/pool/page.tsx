@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Tournament } from "@/lib/types";
 import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
+import { ClipboardCheck, Trash2 } from "lucide-react";
 
 export default function PoolPage({
   params,
@@ -46,6 +47,16 @@ export default function PoolPage({
   const totalCount = allSlots.length;
   const singleImportInFlight =
     !applyingAll && Object.values(slotImporting).some(Boolean);
+  const pageFrozen = applyingAll || singleImportInFlight;
+
+  useEffect(() => {
+    if (!pageFrozen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [pageFrozen]);
   const pendingSlotIds = allSlots
     .filter(
       (sl) =>
@@ -182,7 +193,10 @@ export default function PoolPage({
         </div>
       )}
 
-      <div>
+      <div
+        aria-hidden={pageFrozen || undefined}
+        style={pageFrozen ? { pointerEvents: "none" } : undefined}
+      >
         {tournament.stages.map((stage) => (
           <section key={stage.id} className="pool-stage">
             <div className="pool-stage-head">
@@ -238,7 +252,7 @@ export default function PoolPage({
                               title="Clear slot"
                               aria-label={`Clear beatmap from slot ${slot.code}`}
                             >
-                              ×
+                              <Trash2 size={14} aria-hidden="true" />
                             </button>
                           </>
                         ) : (
@@ -272,7 +286,7 @@ export default function PoolPage({
                               {slotImporting[slot.id] ? (
                                 <span className="spinner" aria-hidden="true" />
                               ) : (
-                                "✓"
+                                <ClipboardCheck size={14} aria-hidden="true" />
                               )}
                             </button>
                           </>
@@ -310,7 +324,11 @@ export default function PoolPage({
         </div>
       )}
 
-      <div className="wizard-nav">
+      <div
+        className="wizard-nav"
+        aria-hidden={pageFrozen || undefined}
+        style={pageFrozen ? { pointerEvents: "none" } : undefined}
+      >
         <span className="wizard-step-indicator">
           {filledCount} / {totalCount} slots filled
           {filledCount < totalCount && (
