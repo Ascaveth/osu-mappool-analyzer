@@ -43,7 +43,12 @@ const (
 	jumpDistanceThreshold = 150.0
 
 	// techAnchorCountThreshold marks a beatmap's average slider anchor
-	// count as complex enough to call the map "tech"-oriented.
+	// count as complex enough to call the map "tech"-oriented. This is one
+	// of two independent tech signals (see DefaultTaxonomy's "tech" rule) —
+	// on its own it only catches slider-shape complexity, not the
+	// rhythm/pattern irregularity the osu! community also calls "tech"
+	// (there is no single agreed-upon definition; see the wiki's own
+	// hedging on the term).
 	techAnchorCountThreshold = 4.0
 
 	// lowReverseSliderRatio marks a beatmap as slider-simple enough (few
@@ -53,9 +58,41 @@ const (
 	// independently, so this only narrows aim's Match).
 	lowReverseSliderRatio = 0.2
 
-	// altMinRunLength marks a dense-but-not-stream run of circles (below
-	// pattern's own stream threshold) as "alt"/finger-control-oriented.
+	// altMinRunLength marks a run of circles as sustained enough to force
+	// finger alternation, distinguishing it from a couple of single-tappable
+	// notes. Unlike stream/burst (pattern.streamMinLength/burstMinLength),
+	// this threshold is not what makes a run "alt" — the BPM band
+	// (altMinBPM/altMaxBPM) is. A run this long or longer at alt-band BPM
+	// is alt regardless of whether it also clears pattern's stream
+	// threshold; a beatmap can be tagged both "alt" and "stream".
 	altMinRunLength = 3
+
+	// altMinBPM and altMaxBPM bound the tap-speed range the osu! community
+	// defines "alt" by: 1/4-snap notes at roughly 100-150 BPM are fast
+	// enough that single-tapping becomes unsustainable, forcing the player
+	// to alternate between two fingers, without being so fast that the
+	// challenge shifts to raw tapping endurance (that's "stream," a
+	// separate skillset — see pattern.streamSnapDivisor's doc comment).
+	// This is what pattern.go's own run-length grouping cannot tell you on
+	// its own: run length only says "how many 1/4-snap notes in a row,"
+	// not "is that run's BPM in the range that forces alternation" — the
+	// same run length means something different at 90 BPM (single-tappable,
+	// not alt) versus 130 BPM (alt) versus 220 BPM (stream/burst).
+	altMinBPM = 100.0
+	altMaxBPM = 150.0
+
+	// jumpstreamSpacingCVThreshold marks a stream run's spacing as
+	// irregular enough, at or above this coefficient of variation
+	// (stddev/mean of inter-note distance), to call a stream+wide-jump
+	// beatmap "tech" rather than "stream": the same surface pattern
+	// (jumpstream) tests a different skill depending on whether its
+	// spacing is predictable or not. A clean, evenly-spaced jumpstream
+	// (below this threshold) is a stream slot that happens to have jumps
+	// in it — an aim/endurance test, tagged "stream" only. An irregular
+	// one (at/above this threshold) is a tech map using stream density as
+	// its vehicle — the player must adapt to shifting spacing mid-run,
+	// not just sustain it.
+	jumpstreamSpacingCVThreshold = 0.35
 )
 
 // DefaultTaxonomy returns the built-in skillset classification rules.
@@ -76,10 +113,23 @@ func DefaultTaxonomy() []SkillsetRule {
 			return p.StreamCount > 0
 		}},
 		{Skillset: "tech", Match: func(p pattern.SkillsetProfile) bool {
-			return p.AvgAnchorCount >= techAnchorCountThreshold
+			// Two independent tech traits, either sufficient on its own:
+			// slider-shape complexity, or an irregular jumpstream (wide
+			// jumps whose spacing shifts mid-run — see
+			// jumpstreamSpacingCVThreshold's doc comment for why the CV
+			// gate matters: a jumpstream with predictable spacing is
+			// stream-territory, not tech, regardless of how wide the
+			// jumps are). Neither claims to be a complete definition of
+			// "tech" — see techAnchorCountThreshold's doc comment.
+			return p.AvgAnchorCount >= techAnchorCountThreshold ||
+				(p.StreamCount > 0 && p.AvgJumpDistance >= jumpDistanceThreshold && p.MaxStreamSpacingCV >= jumpstreamSpacingCVThreshold)
 		}},
 		{Skillset: "alt", Match: func(p pattern.SkillsetProfile) bool {
-			return p.StreamCount == 0 && p.LongestRunLength >= altMinRunLength
+			// BPM band is the defining trait, not run length or the
+			// absence of a "stream"-length run — see altMinBPM/altMaxBPM's
+			// doc comment. A long 1/4-snap run at alt-band BPM is alt even
+			// if it's also long enough to be tagged "stream".
+			return p.BPM >= altMinBPM && p.BPM <= altMaxBPM && p.LongestRunLength >= altMinRunLength
 		}},
 		{Skillset: "aim", Match: func(p pattern.SkillsetProfile) bool {
 			return p.AvgJumpDistance >= jumpDistanceThreshold && p.ReverseSliderRatio < lowReverseSliderRatio

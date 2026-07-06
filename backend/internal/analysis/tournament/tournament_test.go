@@ -40,6 +40,72 @@ func streamBeatmap(id string) *domain.Beatmap {
 	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
 }
 
+// jumpstreamBeatmap returns a beatmap classified "tech" by DefaultTaxonomy
+// via the irregular-jumpstream signal (StreamCount>0, wide AvgJumpDistance,
+// and spacing that alternates 300px/100px so MaxStreamSpacingCV clears
+// jumpstreamSpacingCVThreshold) rather than slider anchor complexity: an
+// 8-note run at 1/4 snap under 180 BPM (mirrors streamBeatmap). Unlike a
+// regularJumpstreamBeatmap (evenly-spaced, no CV), this run's spacing
+// shifts note-to-note — the player must adapt mid-run, not just sustain a
+// fixed pattern, which is what makes it tech-territory rather than
+// stream-territory despite the identical surface pattern.
+func jumpstreamBeatmap(id string) *domain.Beatmap {
+	x := 0
+	var objects []domain.HitObject
+	for i := 0; i < 8; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, X: x, StartTime: ms(i * 80), EndTime: ms(i * 80)})
+		if i%2 == 0 {
+			x += 300
+		} else {
+			x += 100
+		}
+	}
+	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
+}
+
+// regularJumpstreamBeatmap returns a beatmap classified "stream" (not
+// "tech") by DefaultTaxonomy: an 8-note run at 1/4 snap under 180 BPM with
+// perfectly even 300px spacing (MaxStreamSpacingCV == 0). Same surface
+// pattern as jumpstreamBeatmap — stream density plus wide jumps — but
+// predictable spacing makes it a stream slot that happens to have jumps in
+// it (an aim/endurance test), not a tech map using stream density as its
+// vehicle.
+func regularJumpstreamBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 8; i++ {
+		x := 0
+		if i%2 == 1 {
+			x = 300
+		}
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, X: x, StartTime: ms(i * 80), EndTime: ms(i * 80)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
+}
+
+// altBeatmap returns a beatmap classified "alt" by DefaultTaxonomy: a 3-note
+// 1/4-snap run at 120 BPM, inside the [altMinBPM, altMaxBPM] band that
+// forces finger alternation without being fast enough to read as "stream".
+func altBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 3; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, StartTime: ms(i * 120)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 120, HitObjects: objects}
+}
+
+// fastBurstBeatmap returns a beatmap with the same run length as
+// altBeatmap (3 notes, 1/4 snap) but at 280 BPM, outside the alt band: per
+// DefaultTaxonomy this must NOT classify as "alt" — a short burst at high
+// BPM is a burst, not alt, regardless of run length (the community
+// distinction altMinBPM/altMaxBPM's doc comment describes).
+func fastBurstBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 3; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, StartTime: ms(i * 50)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 280, HitObjects: objects}
+}
+
 // unclassifiedBeatmap returns a beatmap matching no DefaultTaxonomy rule: a
 // single circle, no jumps, no run, no sliders.
 func unclassifiedBeatmap(id string) *domain.Beatmap {
@@ -470,6 +536,101 @@ func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a skillset-overload finding (3 of 4 slots are jump/aim)")
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesIrregularJumpstreamAsTech(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", jumpstreamBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_tech"]; got != 1 {
+		t.Errorf("skillset_count_tech = %v, want 1 (irregular jumpstream: stream + wide jumps + shifting spacing)", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesRegularJumpstreamAsStreamNotTech(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", regularJumpstreamBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_tech"]; got != 0 {
+		t.Errorf("skillset_count_tech = %v, want 0 (evenly-spaced jumpstream is stream-territory, not tech, regardless of jump width)", got)
+	}
+	if got := result.Metrics["skillset_count_stream"]; got != 1 {
+		t.Errorf("skillset_count_stream = %v, want 1", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesAltBandBPMAsAlt(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", altBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_alt"]; got != 1 {
+		t.Errorf("skillset_count_alt = %v, want 1 (3-note 1/4-snap run at 120 BPM, inside the alt band)", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_DoesNotClassifyFastBurstAsAlt(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", fastBurstBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_alt"]; got != 0 {
+		t.Errorf("skillset_count_alt = %v, want 0 (same run length as altBeatmap, but 280 BPM is outside the alt band, so it's a burst, not alt)", got)
 	}
 }
 
