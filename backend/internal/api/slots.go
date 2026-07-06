@@ -45,7 +45,13 @@ func (s *Server) AssignSlotBeatmap(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toSlotDTO(*slot))
+	// categoryName is unknown here (AssignSlotBeatmap returns only the
+	// updated Slot, not its owning Category) — effective_difficulty comes
+	// back nil for this response. Not a functional gap: callers re-fetch
+	// the whole Tournament afterward for category-aware data (see
+	// frontend/lib/api/rest.ts's assignBeatmap, which discards this
+	// response's own derived fields the same way).
+	writeJSON(w, http.StatusOK, toSlotDTO(r.Context(), *slot, "", s.StarRatings))
 }
 
 // UnassignSlotBeatmap handles DELETE /slots/{slotId}/beatmap.

@@ -83,6 +83,7 @@ func main() {
 		memory.NewBeatmapRepository(),
 		engine,
 		enricher,
+		starRatings,
 	)
 
 	handler := api.Logging(api.CORS(cfg.AllowedOrigins, api.NewRouter(server)))

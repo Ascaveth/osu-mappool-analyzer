@@ -19,5 +19,5 @@ func (s *Server) GetStage(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toStageDTO(*stage))
+	writeJSON(w, http.StatusOK, toStageDTO(r.Context(), *stage, s.StarRatings))
 }

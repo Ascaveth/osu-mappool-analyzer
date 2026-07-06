@@ -7,6 +7,28 @@ export function formatBeatmapLabel(
   return `${bm.artist} - ${bm.title} - [${bm.version}]`;
 }
 
+// Formats one AR/OD/CS/HP stat using the slot's mod-effective value (see
+// lib/types.ts's EffectiveDifficulty) when available — that's what the
+// slot is actually played at (e.g. HR-scaled AR/OD/CS/HP) — falling back
+// to the beatmap's raw .osu value only when there's no effective value to
+// show (unfilled slot, or a category with no single fixed mod).
+export function formatStat(label: string, raw: number, effective: number | undefined): string {
+  return `${label} ${(effective ?? raw).toFixed(1)}`;
+}
+
+// Same idea as formatStat, but for BPM: whole numbers.
+export function formatBpm(raw: number, effective: number | undefined): string {
+  return `${Math.round(effective ?? raw)} BPM`;
+}
+
+// Formats a slot's real, mod-specific Star Rating (see
+// lib/types.ts's EffectiveDifficulty.starRating) — null when star rating
+// fetching is disabled or this mod combination hasn't been enriched yet,
+// shown as "SR --" rather than a misleading 0.
+export function formatStarRating(starRating: number | null | undefined): string {
+  return starRating == null ? "SR --" : `SR ${starRating.toFixed(2)}`;
+}
+
 const MOD_ACCENTS: Record<string, string> = {
   NM: "var(--mod-nm)",
   HD: "var(--mod-hd)",

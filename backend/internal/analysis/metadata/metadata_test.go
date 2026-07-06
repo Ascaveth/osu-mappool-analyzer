@@ -349,6 +349,76 @@ func TestCSPrecisionAnalyzer_NormalCSProducesNoFindings(t *testing.T) {
 	}
 }
 
+func TestBPMRangeAnalyzer_DoubleTimeCategoryUsesEffectiveBPM(t *testing.T) {
+	tournament := buildTournament()
+	dtCategory := &tournament.Stages[0].Categories[2] // Name "DT", currently one nil slot
+	dtCategory.Slots = []domain.Slot{
+		{ID: "dt-slot-1", Position: 1, Beatmap: bm("dt-bm-1", "MapperA", 180)},
+		{ID: "dt-slot-2", Position: 2, Beatmap: bm("dt-bm-2", "MapperA", 180)},
+	}
+
+	result, err := BPMRangeAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeCategory, ID: "cat-empty"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["bpm_mean"]; got != 270 { // 180 raw * 1.5 DT rate
+		t.Errorf("bpm_mean = %v, want 270 (raw BPM scaled by DT's 1.5x rate)", got)
+	}
+}
+
+func TestARCalibrationAnalyzer_HardRockCategoryUsesEffectiveAR(t *testing.T) {
+	tournament := buildTournament()
+	hrCategory := domain.Category{
+		ID: "cat-hr", Name: "HR", Order: 4,
+		Slots: []domain.Slot{
+			{ID: "hr-slot-1", Position: 1, Beatmap: bm("hr-bm-1", "MapperA", 140)},
+		},
+	}
+	hrCategory.Slots[0].Beatmap.AR = 7 // raw AR 7 / BPM 140 -> ratio ~2.1, within [1.2, 4.0]
+	tournament.Stages[0].Categories = append(tournament.Stages[0].Categories, hrCategory)
+
+	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: "hr-bm-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	// HR scales AR 7 -> 9.8, shortening the reading window enough to drop
+	// the ratio to ~1.12, crossing arRatioLowThreshold even though the raw
+	// AR/BPM pairing didn't.
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 (HR's effective AR should trigger a short-window finding)", len(result.Findings))
+	}
+}
+
+func TestCSPrecisionAnalyzer_HardRockCategoryUsesEffectiveCS(t *testing.T) {
+	tournament := buildTournament()
+	hrCategory := domain.Category{
+		ID: "cat-hr", Name: "HR", Order: 4,
+		Slots: []domain.Slot{
+			{ID: "hr-slot-1", Position: 1, Beatmap: bm("hr-bm-1", "MapperA", 180)},
+		},
+	}
+	hrCategory.Slots[0].Beatmap.CS = 5.0 // raw CS is below csSpikeThreshold (6.5)
+	tournament.Stages[0].Categories = append(tournament.Stages[0].Categories, hrCategory)
+
+	result, err := CSPrecisionAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: "hr-bm-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	// 5.0 * 1.3 (HR's CS multiplier) = 6.5, at the threshold.
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 (HR's effective CS should cross csSpikeThreshold)", len(result.Findings))
+	}
+}
+
 func TestMetadataAnalyzers_RunTogetherInEngineWithoutInterference(t *testing.T) {
 	e := analysis.NewEngine()
 	for _, a := range []analysis.Analyzer{

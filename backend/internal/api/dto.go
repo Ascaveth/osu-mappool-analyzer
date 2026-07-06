@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
 	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis/tournament"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/modmap"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/storage"
 )
 
 // Wire request/response shapes, matching docs/api/openapi.yaml's schemas
@@ -65,9 +68,28 @@ type categoryDTO struct {
 }
 
 type slotDTO struct {
-	ID        string  `json:"id"`
-	Position  int     `json:"position"`
-	BeatmapID *string `json:"beatmap_id"`
+	ID                  string                  `json:"id"`
+	Position            int                     `json:"position"`
+	BeatmapID           *string                 `json:"beatmap_id"`
+	EffectiveDifficulty *effectiveDifficultyDTO `json:"effective_difficulty"`
+}
+
+// effectiveDifficultyDTO is a filled slot's AR/OD/CS/HP/BPM/length as they
+// actually play under the slot's own Category's fixed mod (HR, DT, ...),
+// not the beatmap's raw .osu values — see modmap.EffectiveDifficultyFor.
+// Distinct from Beatmap's own raw fields (never duplicated: Slot still
+// references Beatmap by ID only, per docs/06-domain-model.md) because this
+// is placement-specific derived data, not a second copy of the Beatmap
+// aggregate — the same beatmap re-used in an HR slot and an NM slot has
+// two different EffectiveDifficulty values but one Beatmap.
+type effectiveDifficultyDTO struct {
+	AR            float64  `json:"ar"`
+	OD            float64  `json:"od"`
+	CS            float64  `json:"cs"`
+	HP            float64  `json:"hp"`
+	BPM           float64  `json:"bpm"`
+	LengthSeconds int      `json:"length_seconds"`
+	StarRating    *float64 `json:"star_rating"`
 }
 
 type beatmapDTO struct {
@@ -143,18 +165,18 @@ func toTournamentSummaryDTO(t domain.Tournament) tournamentSummaryDTO {
 	}
 }
 
-func toTournamentDTO(t *domain.Tournament) tournamentDTO {
+func toTournamentDTO(ctx context.Context, t *domain.Tournament, starRatings storage.StarRatingRepository) tournamentDTO {
 	stages := make([]stageDTO, len(t.Stages))
 	for i, s := range t.Stages {
-		stages[i] = toStageDTO(s)
+		stages[i] = toStageDTO(ctx, s, starRatings)
 	}
 	return tournamentDTO{ID: t.ID, Name: t.Name, Edition: t.Edition, Stages: stages}
 }
 
-func toStageDTO(s domain.Stage) stageDTO {
+func toStageDTO(ctx context.Context, s domain.Stage, starRatings storage.StarRatingRepository) stageDTO {
 	cats := make([]categoryDTO, len(s.Categories))
 	for i, c := range s.Categories {
-		cats[i] = toCategoryDTO(c)
+		cats[i] = toCategoryDTO(ctx, c, starRatings)
 	}
 	return stageDTO{
 		ID:                  s.ID,
@@ -165,21 +187,61 @@ func toStageDTO(s domain.Stage) stageDTO {
 	}
 }
 
-func toCategoryDTO(c domain.Category) categoryDTO {
+func toCategoryDTO(ctx context.Context, c domain.Category, starRatings storage.StarRatingRepository) categoryDTO {
 	slots := make([]slotDTO, len(c.Slots))
 	for i, s := range c.Slots {
-		slots[i] = toSlotDTO(s)
+		slots[i] = toSlotDTO(ctx, s, c.Name, starRatings)
 	}
 	return categoryDTO{ID: c.ID, Name: c.Name, Order: c.Order, Slots: slots}
 }
 
-func toSlotDTO(s domain.Slot) slotDTO {
+func toSlotDTO(ctx context.Context, s domain.Slot, categoryName string, starRatings storage.StarRatingRepository) slotDTO {
 	var beatmapID *string
 	if s.Beatmap != nil {
 		id := s.Beatmap.ID
 		beatmapID = &id
 	}
-	return slotDTO{ID: s.ID, Position: s.Position, BeatmapID: beatmapID}
+	return slotDTO{
+		ID:                  s.ID,
+		Position:            s.Position,
+		BeatmapID:           beatmapID,
+		EffectiveDifficulty: toEffectiveDifficultyDTO(ctx, s.Beatmap, categoryName, starRatings),
+	}
+}
+
+// toEffectiveDifficultyDTO returns nil when the slot is unfilled or its
+// Category has no single fixed mod (FreeMod, Tiebreaker, or an
+// unrecognized name) — there is no sound single mod-adjusted value to
+// report in either case (see modmap.FromCategoryName). Its StarRating
+// field is separately best-effort: nil starRatings (fetching disabled) or
+// a lookup miss (not yet enriched) both leave StarRating nil without
+// failing the rest of the effective-difficulty payload, same as every
+// analyzer's "insufficient data" convention.
+func toEffectiveDifficultyDTO(ctx context.Context, b *domain.Beatmap, categoryName string, starRatings storage.StarRatingRepository) *effectiveDifficultyDTO {
+	if b == nil {
+		return nil
+	}
+	mods, ok := modmap.FromCategoryName(categoryName)
+	if !ok {
+		return nil
+	}
+	eff := modmap.EffectiveDifficultyFor(b.AR, b.OD, b.CS, b.HP, b.BPM, b.LengthSeconds, mods)
+	return &effectiveDifficultyDTO{
+		AR: eff.AR, OD: eff.OD, CS: eff.CS, HP: eff.HP, BPM: eff.BPM, LengthSeconds: eff.LengthSeconds,
+		StarRating: lookupStarRating(ctx, b.ID, mods, starRatings),
+	}
+}
+
+func lookupStarRating(ctx context.Context, beatmapID string, mods modmap.Mods, starRatings storage.StarRatingRepository) *float64 {
+	if starRatings == nil {
+		return nil
+	}
+	sr, err := starRatings.Find(ctx, beatmapID, uint32(mods))
+	if err != nil {
+		return nil
+	}
+	v := sr.Value
+	return &v
 }
 
 func toBeatmapDTO(b *domain.Beatmap) beatmapDTO {
