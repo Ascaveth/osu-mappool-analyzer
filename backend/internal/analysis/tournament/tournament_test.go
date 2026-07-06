@@ -785,9 +785,9 @@ func TestSkillRedundancyAnalyzer_FlagsNearIdenticalProfiles(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{
-				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
-				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", jumpBeatmap("bm2"))}},
-				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", streamBeatmap("bm3"))}},
+				{ID: "cat-nm", Name: "NM", Order: 1, Slots: []domain.Slot{{ID: "s1", Position: 1, Beatmap: jumpBeatmap("bm1")}}},
+				{ID: "cat-hr", Name: "HR", Order: 2, Slots: []domain.Slot{{ID: "s2", Position: 1, Beatmap: jumpBeatmap("bm2")}}},
+				{ID: "cat-dt", Name: "DT", Order: 3, Slots: []domain.Slot{{ID: "s3", Position: 1, Beatmap: streamBeatmap("bm3")}}},
 			},
 		}},
 	}
@@ -807,12 +807,12 @@ func TestSkillRedundancyAnalyzer_FlagsNearIdenticalProfiles(t *testing.T) {
 
 	found := false
 	for _, f := range result.Findings {
-		if strings.Contains(f.Description, "s1") && strings.Contains(f.Description, "s2") {
+		if strings.Contains(f.Description, "NM1") && strings.Contains(f.Description, "HR1") {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected a redundancy finding pairing s1 and s2 (both jumpBeatmap)")
+		t.Error("expected a redundancy finding pairing NM1 and HR1 (both jumpBeatmap)")
 	}
 }
 

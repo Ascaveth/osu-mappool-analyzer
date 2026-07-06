@@ -6,20 +6,27 @@ const GLYPH: Record<Citation["finding"]["severity"], string> = {
   info: "·",
 };
 
-const ANALYZER_LABEL: Record<string, string> = {
-  "composition-analyzer": "Composition",
-  "progression-analyzer": "Progression",
-  "balance-analyzer": "Balance",
-  "diversity-analyzer": "Diversity",
-};
+// Analyzers write descriptions lowercase (mid-sentence style, e.g. for
+// composing into summary text); capitalize the first letter here so it
+// reads correctly as its own sentence in the report.
+function capitalize(text: string): string {
+  return text.length > 0 ? text[0].toUpperCase() + text.slice(1) : text;
+}
 
 /**
  * Renders a margin note for a citation.
  *
  * @param citation - The citation data to display
- * @returns A margin note showing the severity marker, finding text, reason, and source label
+ * @param locationLabel - Optional resolved scope location (e.g. "Round of 16 · NM3")
+ * @returns A margin note showing the severity marker, finding text, and location
  */
-export function MarginNote({ citation }: { citation: Citation }) {
+export function MarginNote({
+  citation,
+  locationLabel,
+}: {
+  citation: Citation;
+  locationLabel?: string | null;
+}) {
   return (
     <div className="note">
       <span
@@ -29,11 +36,8 @@ export function MarginNote({ citation }: { citation: Citation }) {
         {GLYPH[citation.finding.severity]}
       </span>
       <div className="note-body">
-        <p className="note-text">{citation.finding.description}.</p>
-        <p className="note-why">{citation.finding.reason}.</p>
-        <span className="note-source">
-          {ANALYZER_LABEL[citation.analyzerName] ?? citation.analyzerName}
-        </span>
+        <p className="note-text">{capitalize(citation.finding.description)}.</p>
+        {locationLabel && <span className="note-source">{locationLabel}</span>}
       </div>
     </div>
   );

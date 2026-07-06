@@ -44,8 +44,10 @@ const ThemeSwitch = ({
         onCheckedChange={handleCheckedChange}
         aria-label={checked ? "Switch to light theme" : "Switch to dark theme"}
         className={cn(
-          // root (track)
-          "peer absolute inset-0 h-full w-full rounded-full bg-input/50 transition-colors",
+          // root (track) — distinct background per state so the current
+          // mode reads at a glance, not just from icon color/opacity
+          "peer absolute inset-0 h-full w-full rounded-full transition-colors",
+          checked ? "bg-slate-800" : "bg-amber-100",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           // tune the default thumb size & z-index so it slides over icons
           "[&>span]:h-7 [&>span]:w-7 [&>span]:rounded-full [&>span]:bg-background [&>span]:shadow [&>span]:z-10",
@@ -66,7 +68,7 @@ const ThemeSwitch = ({
           size={16}
           className={cn(
             "transition-all duration-200 ease-out",
-            checked ? "text-muted-foreground/70" : "text-foreground scale-110"
+            checked ? "text-slate-400" : "text-amber-600 scale-110"
           )}
         />
       </span>
@@ -81,7 +83,7 @@ const ThemeSwitch = ({
           size={16}
           className={cn(
             "transition-all duration-200 ease-out",
-            checked ? "text-foreground scale-110" : "text-muted-foreground/70"
+            checked ? "text-blue-200 scale-110" : "text-amber-700/60"
           )}
         />
       </span>

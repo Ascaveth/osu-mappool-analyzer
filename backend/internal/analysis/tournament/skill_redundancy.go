@@ -127,8 +127,7 @@ func rmsDistance(a, b skillProfileVector) float64 {
 }
 
 type redundantPair struct {
-	slotAID, slotBID     string
-	categoryA, categoryB string
+	slotACode, slotBCode string
 	distance             float64
 }
 
@@ -138,22 +137,29 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		return analysis.Result{}, fmt.Errorf("tournament: stage %q not found in tournament", in.Scope.ID)
 	}
 
-	var slotIDs []string
-	var categoryNames []string
+	nameOccurrences := make(map[string]int, len(stage.Categories))
+	for _, c := range stage.Categories {
+		nameOccurrences[c.Name]++
+	}
+
+	var slotCodes []string
 	var vectors []skillProfileVector
 	for _, c := range stage.Categories {
 		for _, slot := range c.Slots {
 			if slot.Beatmap == nil {
 				continue
 			}
-			slotIDs = append(slotIDs, slot.ID)
-			categoryNames = append(categoryNames, c.Name)
+			code := fmt.Sprintf("%s%d", c.Name, slot.Position)
+			if nameOccurrences[c.Name] > 1 {
+				code = fmt.Sprintf("%s%d (category #%d)", c.Name, slot.Position, c.Order)
+			}
+			slotCodes = append(slotCodes, code)
 			vectors = append(vectors, vectorFromProfile(pattern.ComputeSkillsetProfile(slot.Beatmap)))
 		}
 	}
 
-	metrics := map[string]float64{"filled_slots": float64(len(slotIDs))}
-	if len(slotIDs) < minSlotsForRedundancyJudgment {
+	metrics := map[string]float64{"filled_slots": float64(len(slotCodes))}
+	if len(slotCodes) < minSlotsForRedundancyJudgment {
 		return analysis.Result{Metrics: metrics}, nil
 	}
 
@@ -169,8 +175,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 			}
 			if d < redundancySimilarityThreshold {
 				pairs = append(pairs, redundantPair{
-					slotAID: slotIDs[i], slotBID: slotIDs[j],
-					categoryA: categoryNames[i], categoryB: categoryNames[j],
+					slotACode: slotCodes[i], slotBCode: slotCodes[j],
 					distance: d,
 				})
 			}
@@ -188,10 +193,10 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		if pairs[i].distance != pairs[j].distance {
 			return pairs[i].distance < pairs[j].distance
 		}
-		if pairs[i].slotAID != pairs[j].slotAID {
-			return pairs[i].slotAID < pairs[j].slotAID
+		if pairs[i].slotACode != pairs[j].slotACode {
+			return pairs[i].slotACode < pairs[j].slotACode
 		}
-		return pairs[i].slotBID < pairs[j].slotBID
+		return pairs[i].slotBCode < pairs[j].slotBCode
 	})
 
 	reportCount := len(pairs)
@@ -203,7 +208,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	for _, p := range pairs[:reportCount] {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
-			Description:    fmt.Sprintf("slot %q (%s) and slot %q (%s) test a near-identical mechanical skill profile despite different category labels", p.slotAID, p.categoryA, p.slotBID, p.categoryB),
+			Description:    fmt.Sprintf("%s and %s test a near-identical mechanical skill profile despite different category labels", p.slotACode, p.slotBCode),
 			Reason:         "a map can be individually well-built and correctly calibrated yet still burn a slot the pool didn't need, if it tests the same skill the same way another slot already does",
 			Recommendation: "replace one of these beatmaps with a map that covers a different mechanical skill, or a different way of testing the same skill",
 		})
