@@ -137,6 +137,11 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		return analysis.Result{}, fmt.Errorf("tournament: stage %q not found in tournament", in.Scope.ID)
 	}
 
+	nameOccurrences := make(map[string]int, len(stage.Categories))
+	for _, c := range stage.Categories {
+		nameOccurrences[c.Name]++
+	}
+
 	var slotCodes []string
 	var vectors []skillProfileVector
 	for _, c := range stage.Categories {
@@ -144,7 +149,11 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 			if slot.Beatmap == nil {
 				continue
 			}
-			slotCodes = append(slotCodes, fmt.Sprintf("%s%d", c.Name, slot.Position))
+			code := fmt.Sprintf("%s%d", c.Name, slot.Position)
+			if nameOccurrences[c.Name] > 1 {
+				code = fmt.Sprintf("%s%d (category #%d)", c.Name, slot.Position, c.Order)
+			}
+			slotCodes = append(slotCodes, code)
 			vectors = append(vectors, vectorFromProfile(pattern.ComputeSkillsetProfile(slot.Beatmap)))
 		}
 	}
