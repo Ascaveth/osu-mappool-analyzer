@@ -40,6 +40,72 @@ func streamBeatmap(id string) *domain.Beatmap {
 	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
 }
 
+// jumpstreamBeatmap returns a beatmap classified "tech" by DefaultTaxonomy
+// via the irregular-jumpstream signal (StreamCount>0, wide AvgJumpDistance,
+// and spacing that alternates 300px/100px so MaxStreamSpacingCV clears
+// jumpstreamSpacingCVThreshold) rather than slider anchor complexity: an
+// 8-note run at 1/4 snap under 180 BPM (mirrors streamBeatmap). Unlike a
+// regularJumpstreamBeatmap (evenly-spaced, no CV), this run's spacing
+// shifts note-to-note — the player must adapt mid-run, not just sustain a
+// fixed pattern, which is what makes it tech-territory rather than
+// stream-territory despite the identical surface pattern.
+func jumpstreamBeatmap(id string) *domain.Beatmap {
+	x := 0
+	var objects []domain.HitObject
+	for i := 0; i < 8; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, X: x, StartTime: ms(i * 80), EndTime: ms(i * 80)})
+		if i%2 == 0 {
+			x += 300
+		} else {
+			x += 100
+		}
+	}
+	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
+}
+
+// regularJumpstreamBeatmap returns a beatmap classified "stream" (not
+// "tech") by DefaultTaxonomy: an 8-note run at 1/4 snap under 180 BPM with
+// perfectly even 300px spacing (MaxStreamSpacingCV == 0). Same surface
+// pattern as jumpstreamBeatmap — stream density plus wide jumps — but
+// predictable spacing makes it a stream slot that happens to have jumps in
+// it (an aim/endurance test), not a tech map using stream density as its
+// vehicle.
+func regularJumpstreamBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 8; i++ {
+		x := 0
+		if i%2 == 1 {
+			x = 300
+		}
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, X: x, StartTime: ms(i * 80), EndTime: ms(i * 80)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 180, HitObjects: objects}
+}
+
+// altBeatmap returns a beatmap classified "alt" by DefaultTaxonomy: a 3-note
+// 1/4-snap run at 120 BPM, inside the [altMinBPM, altMaxBPM] band that
+// forces finger alternation without being fast enough to read as "stream".
+func altBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 3; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, StartTime: ms(i * 120)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 120, HitObjects: objects}
+}
+
+// fastBurstBeatmap returns a beatmap with the same run length as
+// altBeatmap (3 notes, 1/4 snap) but at 280 BPM, outside the alt band: per
+// DefaultTaxonomy this must NOT classify as "alt" — a short burst at high
+// BPM is a burst, not alt, regardless of run length (the community
+// distinction altMinBPM/altMaxBPM's doc comment describes).
+func fastBurstBeatmap(id string) *domain.Beatmap {
+	var objects []domain.HitObject
+	for i := 0; i < 3; i++ {
+		objects = append(objects, domain.HitObject{Type: domain.HitObjectCircle, StartTime: ms(i * 50)})
+	}
+	return &domain.Beatmap{ID: id, BPM: 280, HitObjects: objects}
+}
+
 // unclassifiedBeatmap returns a beatmap matching no DefaultTaxonomy rule: a
 // single circle, no jumps, no run, no sliders.
 func unclassifiedBeatmap(id string) *domain.Beatmap {
@@ -342,7 +408,98 @@ func TestDiversityAnalyzer_DistinctSongsProduceNoFindings(t *testing.T) {
 	}
 }
 
+func TestDiversityAnalyzer_FlagsClusteredBPM(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 180))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 185))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 190))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["bpm_range"]; got != 10 {
+		t.Errorf("bpm_range = %v, want 10 (190-180)", got)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a BPM-clustering finding (10 BPM range across 3 filled slots)")
+	}
+}
+
+func TestDiversityAnalyzer_SpreadBPMAcrossStageProducesNoClusterFinding(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 120))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 180))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 240))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			t.Error("did not expect a BPM-clustering finding (120 BPM range across 3 filled slots)")
+		}
+	}
+}
+
 // --- SkillCoverageAnalyzer ---
+
+func TestDiversityAnalyzer_ZeroBPMExcludedFromClusterJudgment(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 0))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 0))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 0))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if _, ok := result.Metrics["bpm_range"]; ok {
+		t.Errorf("bpm_range = %v, want metric absent when no positive BPMs exist", result.Metrics["bpm_range"])
+	}
+
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			t.Error("did not expect a BPM-clustering finding when all slots have unresolved (0) BPM")
+		}
+	}
+}
 
 func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
 	tournament := &domain.Tournament{
@@ -379,6 +536,101 @@ func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a skillset-overload finding (3 of 4 slots are jump/aim)")
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesIrregularJumpstreamAsTech(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", jumpstreamBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_tech"]; got != 1 {
+		t.Errorf("skillset_count_tech = %v, want 1 (irregular jumpstream: stream + wide jumps + shifting spacing)", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesRegularJumpstreamAsStreamNotTech(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", regularJumpstreamBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_tech"]; got != 0 {
+		t.Errorf("skillset_count_tech = %v, want 0 (evenly-spaced jumpstream is stream-territory, not tech, regardless of jump width)", got)
+	}
+	if got := result.Metrics["skillset_count_stream"]; got != 1 {
+		t.Errorf("skillset_count_stream = %v, want 1", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_ClassifiesAltBandBPMAsAlt(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", altBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_alt"]; got != 1 {
+		t.Errorf("skillset_count_alt = %v, want 1 (3-note 1/4-snap run at 120 BPM, inside the alt band)", got)
+	}
+}
+
+func TestSkillCoverageAnalyzer_DoesNotClassifyFastBurstAsAlt(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", fastBurstBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillCoverageAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["skillset_count_alt"]; got != 0 {
+		t.Errorf("skillset_count_alt = %v, want 0 (same run length as altBeatmap, but 280 BPM is outside the alt band, so it's a burst, not alt)", got)
 	}
 }
 
@@ -525,12 +777,163 @@ func TestSkillCoverageAnalyzer_NoFilledSlotsDoesNotPanic(t *testing.T) {
 	}
 }
 
+// --- SkillRedundancyAnalyzer ---
+
+func TestSkillRedundancyAnalyzer_FlagsNearIdenticalProfiles(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
+				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", jumpBeatmap("bm2"))}},
+				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", streamBeatmap("bm3"))}},
+			},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["filled_slots"]; got != 3 {
+		t.Errorf("filled_slots = %v, want 3", got)
+	}
+	if got := result.Metrics["redundant_pair_count"]; got != 1 {
+		t.Errorf("redundant_pair_count = %v, want 1 (bm1/bm2 are identical jump beatmaps)", got)
+	}
+
+	found := false
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "s1") && strings.Contains(f.Description, "s2") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a redundancy finding pairing s1 and s2 (both jumpBeatmap)")
+	}
+}
+
+func TestSkillRedundancyAnalyzer_DiverseProfilesProduceNoFindings(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
+				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", streamBeatmap("bm2"))}},
+				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", unclassifiedBeatmap("bm3"))}},
+			},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0, got: %+v", len(result.Findings), result.Findings)
+	}
+}
+
+func TestSkillRedundancyAnalyzer_AllIdenticalDimensionsDoesNotPanic(t *testing.T) {
+	// Every beatmap is identical on every dimension (a single unclassified
+	// circle each): min-max range is 0 for every dimension, which must not
+	// divide by zero.
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{
+					slot("s1", unclassifiedBeatmap("bm1")),
+					slot("s2", unclassifiedBeatmap("bm2")),
+				},
+			}},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["closest_pair_distance"]; got != 0 {
+		t.Errorf("closest_pair_distance = %v, want 0 (identical profiles)", got)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 (identical profiles are maximally redundant)", len(result.Findings))
+	}
+}
+
+func TestSkillRedundancyAnalyzer_TooFewSlotsDoesNotPanic(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{{
+				ID: "cat-1", Order: 1,
+				Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))},
+			}},
+		}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
+	}
+	if got := result.Metrics["filled_slots"]; got != 1 {
+		t.Errorf("filled_slots = %v, want 1", got)
+	}
+}
+
+func TestSkillRedundancyAnalyzer_CapsFindingsAtMaxRedundancyFindings(t *testing.T) {
+	var categories []domain.Category
+	// 8 identical jump beatmaps -> C(8,2) = 28 redundant pairs, all
+	// distance 0, must be capped at maxRedundancyFindings.
+	for i := 0; i < 8; i++ {
+		id := stageID(i)
+		categories = append(categories, domain.Category{
+			ID: "cat-" + id, Order: i + 1,
+			Slots: []domain.Slot{slot("s-"+id, jumpBeatmap("bm-"+id))},
+		})
+	}
+	tournament := &domain.Tournament{
+		ID:     "t-1",
+		Stages: []domain.Stage{{ID: "stage-1", Order: 1, Categories: categories}},
+	}
+
+	result, err := SkillRedundancyAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if got := result.Metrics["redundant_pair_count"]; got != 28 {
+		t.Errorf("redundant_pair_count = %v, want 28", got)
+	}
+	if len(result.Findings) != maxRedundancyFindings {
+		t.Errorf("len(Findings) = %d, want %d (capped)", len(result.Findings), maxRedundancyFindings)
+	}
+}
+
 // --- Integration ---
 
 func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 	e := analysis.NewEngine()
 	for _, a := range []analysis.Analyzer{
-		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{}, SkillCoverageAnalyzer{},
+		CompositionAnalyzer{}, ProgressionAnalyzer{}, BalanceAnalyzer{}, DiversityAnalyzer{}, SkillCoverageAnalyzer{}, SkillRedundancyAnalyzer{},
 	} {
 		if err := e.Register(a); err != nil {
 			t.Fatalf("Register(%s): %v", a.Name(), err)
@@ -544,9 +947,9 @@ func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	// 1 tournament-scoped + 3 stage-scoped (Composition) + 3 stage-scoped
-	// (Diversity) + 3 stage-scoped (SkillCoverage) + 3 category-scoped
-	// (Balance) = 13.
-	if len(results) != 13 {
-		t.Errorf("len(results) = %d, want 13", len(results))
+	// (Diversity) + 3 stage-scoped (SkillCoverage) + 3 stage-scoped
+	// (SkillRedundancy) + 3 category-scoped (Balance) = 16.
+	if len(results) != 16 {
+		t.Errorf("len(results) = %d, want 16", len(results))
 	}
 }

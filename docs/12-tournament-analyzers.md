@@ -11,6 +11,7 @@ Phase 8 deliverable: the cross-cutting analyzers that synthesize Phase 6/7's per
 | `BalanceAnalyzer` | Category | Does each category have variation across AR, OD, and slider ratio? |
 | `DiversityAnalyzer` | Stage | Are BPM, mappers, and songs sufficiently varied across a whole stage? |
 | `SkillCoverageAnalyzer` | Stage | Is the stage's mechanical skillset coverage (aim, stream, tech, jump, alt) balanced and complete? |
+| `SkillRedundancyAnalyzer` | Stage | Do any two slots test a near-identical mechanical skill profile despite different category labels? |
 | `DifficultySpreadAnalyzer` | Stage | Does a stage's slot-to-slot Star Rating progression avoid gaps, spikes, and too-tight/too-wide overall spread, and track its projected target? |
 
 Each one operates at a different scope from its Phase 6/7 counterpart, by design: Phase 6/7 analyzers look *within* one beatmap or one category; these look *across* categories or stages, catching problems no single-category analyzer is positioned to see.
@@ -39,7 +40,10 @@ The tournament-quality counterpart to Phase 6's `BPMRangeAnalyzer`, which only e
 
 ### DiversityAnalyzer (Stage scope)
 
-Reports BPM, mapper, and song diversity across an **entire stage** (all categories combined), catching duplication that's invisible to a single-category view — a stage can have perfectly fine within-category diversity while still reusing the same song or mapper across two different categories. The one finding it raises is fully objective: a **duplicate song** (identical Artist+Title, exact string match) appearing in more than one slot within the same stage — directly implementing CLAUDE.md's "Duplicate characteristics" validation example.
+Reports BPM, mapper, and song diversity across an **entire stage** (all categories combined), catching duplication that's invisible to a single-category view — a stage can have perfectly fine within-category diversity while still reusing the same song or mapper across two different categories. Two findings:
+
+- **Duplicate song** — fully objective: identical Artist+Title (exact string match) appearing in more than one slot within the same stage.
+- **BPM clustering** — Warning when a stage's overall BPM range (across every filled slot, all categories combined) falls below `bpmClusterRangeThreshold` (named, documented calibration constant in `diversity.go`), with at least `minSlotsForBpmClusterJudgment` filled slots. This is the stage-wide, pool-balance-level counterpart to `metadata.BPMRangeAnalyzer`'s per-category *exact-zero-variance* check ([docs/10-metadata-analyzers.md](10-metadata-analyzers.md)): the metadata-feedback framework frames BPM complaints as a pool-wide distribution concern rather than a per-map fault, so the softer "everything sits near the same tempo" pattern belongs here, at the scope that can see across categories, rather than in the metadata package.
 
 ### SkillCoverageAnalyzer (Stage scope)
 
@@ -51,6 +55,14 @@ Classifies each filled slot's beatmap into one or more skillset tags (`aim`, `ju
 This directly targets the most common real-world "unbalanced"/"not fun" mappool complaint found in community feedback (osu! tournament forums, `poolingcore`, established mappooling guides): pools skewing toward one skillset systematically disadvantage players weak in that one area every match, regardless of how varied the pool's raw difficulty numbers are — a distinct problem from `BalanceAnalyzer`'s numeric AR/OD/slider-ratio variance check.
 
 **Taxonomy is a named default, not a hardcoded assumption:** `DefaultTaxonomy()` ships as documented, revisitable Go constants (mirroring `spikeMultiplier`, `streamMinLength`, `categoryMajorityThreshold`), but `SkillCoverageAnalyzer.Taxonomy` is a public field a caller can override entirely. Full per-tournament user-editable taxonomy — a `domain.Tournament`-level field configurable through the API/UI — is an explicit deferred follow-up: no per-tournament settings surface exists in the domain model today, and this codebase's established precedent is to ship a named default first rather than build configurability speculatively.
+
+### SkillRedundancyAnalyzer (Stage scope)
+
+Catches a failure mode `SkillCoverageAnalyzer`'s discrete taxonomy tags can't see: two beatmaps can both match the same boolean skillset rule (e.g. "aim") while having very different jump distances, stream density, and slider complexity — the bucket can't tell that two maps are near-*duplicates* on the underlying continuous profile, not just co-members of one category. An NM1, HR1, and FM1 that all reduce to the same conventional-aim jump pattern burn three slots on one skill despite carrying three different category labels — a "pool-level redundant" map is individually well-built and correctly calibrated, yet still doesn't earn its slot.
+
+Reuses `pattern.ComputeSkillsetProfile` (the same shared pure function `SkillCoverageAnalyzer` uses) to build a six-dimension vector per filled slot (`AvgJumpDistance`, `StreamCount`, `LongestRunLength`, `AvgAnchorCount`, `ReverseSliderRatio`, `SpinnerDensity`), min-max normalizes each dimension across the stage's own filled slots (relative to this pool, not an absolute constant — the same principle `BalanceAnalyzer` already applies to AR/OD/slider-ratio), then computes an RMS distance between every pair of slots. Pairs closer than `redundancySimilarityThreshold` (0.15, a named revisitable constant) are flagged as a Warning, capped at `maxRedundancyFindings` (5) closest pairs per stage so a large pool doesn't spam every near-duplicate combination.
+
+Reports `filled_slots`, `redundant_pair_count` (uncapped total), and `closest_pair_distance`. Requires at least `minSlotsForRedundancyJudgment` (2) filled slots; a stage where every beatmap is identical on every dimension (zero range) treats that dimension as contributing no distinguishing information rather than dividing by zero.
 
 ### DifficultySpreadAnalyzer (Stage scope)
 
@@ -90,14 +102,15 @@ Building a sixth analyzer to re-detect the same conditions under a "Validation" 
 
 ## Testing
 
-`backend/internal/analysis/tournament/tournament_test.go`, 18 tests:
+`backend/internal/analysis/tournament/tournament_test.go`, 25 tests:
 
 - `CompositionAnalyzer`: dominant-category detection, single-mapper-stage detection, with a case confirming a balanced split (50/50) does *not* false-positive.
 - `ProgressionAnalyzer`: regression detection, spike detection, a fully-monotonic sequence producing no findings (Score 1.0), and an insufficient-data (single stage) case that doesn't panic.
 - `BalanceAnalyzer`: all-three-axes zero-variance detection, and a varied-values case producing no findings.
-- `DiversityAnalyzer`: cross-category duplicate song detection, and a distinct-songs case producing no findings.
+- `DiversityAnalyzer`: cross-category duplicate song detection, a distinct-songs case producing no findings, BPM-clustering detection across categories, and a spread-BPM case producing no cluster finding.
 - `SkillCoverageAnalyzer`: skillset-overload detection, missing-skillset detection, a too-few-slots case suppressing the missing-skillset finding, mixed-skillset filled-slot counting, a custom-`Taxonomy` override test, and a no-filled-slots case that doesn't panic.
-- An integration test running all five analyzers through a real `analysis.Engine` together across a 3-stage tournament.
+- `SkillRedundancyAnalyzer`: near-identical-profile detection across different categories, a diverse-profiles case producing no findings, an all-identical-dimensions case that doesn't divide by zero, a too-few-slots case that doesn't panic, and a capped-findings case confirming a large all-identical pool still reports at most `maxRedundancyFindings`.
+- An integration test running all six analyzers through a real `analysis.Engine` together across a 3-stage tournament.
 
 `backend/internal/analysis/pattern/skillset_test.go` covers `ComputeSkillsetProfile` directly: wide-jump distance, stream-run detection, slider anchor/reverse-ratio computation, and zero-BPM/empty-HitObjects cases that must not panic.
 

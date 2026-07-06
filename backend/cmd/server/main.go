@@ -42,6 +42,8 @@ func main() {
 	for _, a := range []analysis.Analyzer{
 		metadata.BPMRangeAnalyzer{},
 		metadata.DifficultySettingsAnalyzer{},
+		metadata.ARCalibrationAnalyzer{},
+		metadata.CSPrecisionAnalyzer{},
 		metadata.MapperRepetitionAnalyzer{},
 		metadata.ObjectDensityAnalyzer{},
 		pattern.JumpDistanceAnalyzer{},
@@ -54,6 +56,7 @@ func main() {
 		tournament.BalanceAnalyzer{},
 		tournament.DiversityAnalyzer{},
 		tournament.SkillCoverageAnalyzer{},
+		tournament.SkillRedundancyAnalyzer{},
 		tournament.DifficultySpreadAnalyzer{StarRatings: starRatings},
 	} {
 		if err := engine.Register(a); err != nil {

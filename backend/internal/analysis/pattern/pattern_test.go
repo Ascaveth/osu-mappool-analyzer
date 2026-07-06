@@ -227,7 +227,7 @@ func TestStreamBurstAnalyzer_UsesLocalTimingNotGlobalBPM(t *testing.T) {
 		ID:  "bm-1",
 		BPM: 120, // dominant/global BPM: the first, longer segment
 		TimingPoints: []domain.TimingPoint{
-			{Offset: ms(0), BeatLength: 500, Uninherited: true},     // 120 BPM
+			{Offset: ms(0), BeatLength: 500, Uninherited: true},      // 120 BPM
 			{Offset: ms(10000), BeatLength: 1000, Uninherited: true}, // 60 BPM
 		},
 		HitObjects: []domain.HitObject{
@@ -251,6 +251,45 @@ func TestStreamBurstAnalyzer_UsesLocalTimingNotGlobalBPM(t *testing.T) {
 	// spacing would NOT satisfy, breaking the run into singletons.
 	if got := result.Metrics["burst_count"]; got != 1 {
 		t.Errorf("burst_count = %v, want 1 (local 60 BPM timing should classify this as one run)", got)
+	}
+}
+
+func TestStreamBurstAnalyzer_FlagsDeathstream(t *testing.T) {
+	var objects []domain.HitObject
+	for i := 0; i < deathstreamMinLength; i++ {
+		objects = append(objects, circle(i*10, 0, i*80))
+	}
+	bm := &domain.Beatmap{ID: "bm-1", BPM: 180, HitObjects: objects}
+
+	result, err := StreamBurstAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: buildTournament(bm), Scope: scope(bm.ID),
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 (run length %d meets deathstream threshold %d)", len(result.Findings), deathstreamMinLength, deathstreamMinLength)
+	}
+	if result.Findings[0].Severity != domain.SeverityWarning {
+		t.Errorf("Severity = %v, want Warning", result.Findings[0].Severity)
+	}
+}
+
+func TestStreamBurstAnalyzer_BelowDeathstreamThresholdNoFinding(t *testing.T) {
+	var objects []domain.HitObject
+	for i := 0; i < deathstreamMinLength-1; i++ {
+		objects = append(objects, circle(i*10, 0, i*80))
+	}
+	bm := &domain.Beatmap{ID: "bm-1", BPM: 180, HitObjects: objects}
+
+	result, err := StreamBurstAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: buildTournament(bm), Scope: scope(bm.ID),
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (run one note short of the deathstream threshold)", len(result.Findings))
 	}
 }
 

@@ -8,6 +8,22 @@ import (
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
+// bpmClusterRangeThreshold marks a stage's BPM values as clustered: when
+// the max-min spread across every filled slot in the stage falls below
+// this, players rarely need to adapt tempo across the stage's maps. This
+// is the stage-wide, softer counterpart to BPMRangeAnalyzer's per-category
+// exact-zero-variance check — BPM feedback is a pool-wide distribution
+// concern, not a per-map fault, so it belongs at Stage scope alongside
+// this analyzer's other cross-category checks. A named, documented
+// judgment call (mirroring skillcoverage.go's jumpDistanceThreshold
+// convention), not a measured fact.
+const bpmClusterRangeThreshold = 15.0
+
+// minSlotsForBpmClusterJudgment mirrors SkillCoverageAnalyzer's
+// minSlotsForCoverageJudgment rationale: a stage with too few filled slots
+// can't meaningfully be judged as "clustered" versus simply small.
+const minSlotsForBpmClusterJudgment = 3
+
 // DiversityAnalyzer reports BPM, mapper, and song diversity across an
 // entire Stage (all of its categories combined) — broader than Phase 6's
 // BPMRangeAnalyzer and MapperRepetitionAnalyzer, which each look at one
@@ -35,6 +51,7 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 		title  string
 	}
 
+	var bpmValues []float64
 	bpms := map[float64]bool{}
 	mappers := map[string]bool{}
 	songCounts := map[songKey]int{}
@@ -46,6 +63,7 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 				continue
 			}
 			filled++
+			bpmValues = append(bpmValues, slot.Beatmap.BPM)
 			bpms[slot.Beatmap.BPM] = true
 			mappers[slot.Beatmap.Mapper] = true
 			songCounts[songKey{artist: slot.Beatmap.Artist, title: slot.Beatmap.Title}]++
@@ -63,6 +81,31 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 	metrics["mapper_diversity_ratio"] = float64(len(mappers)) / float64(filled)
 	metrics["song_diversity_ratio"] = float64(len(songCounts)) / float64(filled)
 
+	// Unresolved BPM (<= 0, mirroring ARCalibrationAnalyzer's guard) is not a
+	// tempo value and must not count toward the clustered-tempo judgment.
+	var positiveBpms []float64
+	for _, b := range bpmValues {
+		if b > 0 {
+			positiveBpms = append(positiveBpms, b)
+		}
+	}
+
+	var bpmRange float64
+	hasBpmRange := len(positiveBpms) > 0
+	if hasBpmRange {
+		bpmMin, bpmMax := positiveBpms[0], positiveBpms[0]
+		for _, b := range positiveBpms[1:] {
+			if b < bpmMin {
+				bpmMin = b
+			}
+			if b > bpmMax {
+				bpmMax = b
+			}
+		}
+		bpmRange = bpmMax - bpmMin
+		metrics["bpm_range"] = bpmRange
+	}
+
 	var findings []domain.Finding
 	duplicates := filled - len(songCounts)
 	if duplicates > 0 {
@@ -71,6 +114,15 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 			Description:    fmt.Sprintf("%d slot(s) in this stage reuse a song already used elsewhere in the same stage", duplicates),
 			Reason:         "the same song appearing more than once within a stage means players encounter it twice instead of being tested on a wider song selection",
 			Recommendation: "replace the duplicate beatmap(s) with a different song",
+		})
+	}
+
+	if hasBpmRange && filled >= minSlotsForBpmClusterJudgment && bpmRange < bpmClusterRangeThreshold {
+		findings = append(findings, domain.Finding{
+			Severity:       domain.SeverityWarning,
+			Description:    fmt.Sprintf("this stage's BPM values cluster within a %.0f BPM range across all categories", bpmRange),
+			Reason:         "BPM feedback is a pool-wide distribution concern rather than a per-map fault: a stage whose maps all sit near the same tempo tests players on one BPM band instead of a spread of tempos",
+			Recommendation: "select at least one beatmap with a meaningfully different BPM somewhere in this stage",
 		})
 	}
 

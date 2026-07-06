@@ -18,10 +18,12 @@ import (
 // the same private helpers (landingObjects, distance, localBeatLengthMs)
 // those analyzers already use, so the two computations cannot drift apart.
 type SkillsetProfile struct {
+	BPM                float64
 	AvgJumpDistance    float64
 	MaxJumpDistance    float64
 	StreamCount        int
 	LongestRunLength   int
+	MaxStreamSpacingCV float64
 	AvgAnchorCount     float64
 	ReverseSliderRatio float64
 	SpinnerDensity     float64
@@ -34,7 +36,7 @@ type SkillsetProfile struct {
 // profile, matching the zero-count early returns every pattern Analyzer in
 // this package already uses.
 func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
-	profile := SkillsetProfile{ObjectCount: len(bm.HitObjects)}
+	profile := SkillsetProfile{BPM: bm.BPM, ObjectCount: len(bm.HitObjects)}
 
 	// Jump distance, reusing landingObjects/distance exactly as
 	// JumpDistanceAnalyzer does.
@@ -69,16 +71,22 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 			fallbackBeatLengthMs := 60000.0 / bm.BPM
 
 			streamCount, longestRun := 0, 0
-			for _, length := range runLengths(circles, timingPoints, fallbackBeatLengthMs) {
+			maxSpacingCV := 0.0
+			for _, run := range groupRuns(circles, timingPoints, fallbackBeatLengthMs) {
+				length := len(run)
 				if length > longestRun {
 					longestRun = length
 				}
 				if length >= streamMinLength {
 					streamCount++
+					if cv := spacingCV(run); cv > maxSpacingCV {
+						maxSpacingCV = cv
+					}
 				}
 			}
 			profile.StreamCount = streamCount
 			profile.LongestRunLength = longestRun
+			profile.MaxStreamSpacingCV = maxSpacingCV
 		}
 	}
 

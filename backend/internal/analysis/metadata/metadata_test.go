@@ -232,10 +232,129 @@ func TestMapperRepetitionAnalyzer_DiverseCategoryProducesNoFindings(t *testing.T
 	}
 }
 
+func TestARCalibrationAnalyzer_FlagsLooseWindowFromLowARFastBPM(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.AR = 3    // approach time 1440ms
+	target.BPM = 300 // beatLength 200ms -> ratio 7.2 (above arRatioHighThreshold)
+
+	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(result.Findings))
+	}
+	if result.Findings[0].Severity != domain.SeverityWarning {
+		t.Errorf("Severity = %v, want Warning", result.Findings[0].Severity)
+	}
+}
+
+func TestARCalibrationAnalyzer_FlagsTightWindowFromHighARLowBPM(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.AR = 9.9 // approach time 465ms
+	target.BPM = 90 // beatLength 667ms -> ratio ~0.70 (below arRatioLowThreshold)
+
+	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(result.Findings))
+	}
+}
+
+func TestARCalibrationAnalyzer_NormalRatioProducesNoFindings(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.AR = 9.3  // approach time 555ms
+	target.BPM = 180 // beatLength 333ms -> ratio ~1.67, within [1.2, 4.0]
+
+	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0, got %+v", len(result.Findings), result.Findings)
+	}
+}
+
+func TestARCalibrationAnalyzer_ZeroBPMDoesNotPanic(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[2].Slots[0].Beatmap
+	if target != nil {
+		t.Fatal("test fixture assumption broken: cat-empty's slot should have a nil Beatmap")
+	}
+
+	// Use a real beatmap but zero its BPM directly.
+	target = tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.BPM = 0
+
+	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (no BPM data)", len(result.Findings))
+	}
+}
+
+func TestCSPrecisionAnalyzer_FlagsHighCS(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.CS = 7.2
+
+	result, err := CSPrecisionAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(result.Findings))
+	}
+	if result.Findings[0].Severity != domain.SeverityWarning {
+		t.Errorf("Severity = %v, want Warning", result.Findings[0].Severity)
+	}
+}
+
+func TestCSPrecisionAnalyzer_NormalCSProducesNoFindings(t *testing.T) {
+	tournament := buildTournament()
+	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
+	target.CS = 4.0
+
+	result, err := CSPrecisionAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament,
+		Scope:      domain.Scope{Type: domain.ScopeBeatmap, ID: target.ID},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
+	}
+}
+
 func TestMetadataAnalyzers_RunTogetherInEngineWithoutInterference(t *testing.T) {
 	e := analysis.NewEngine()
 	for _, a := range []analysis.Analyzer{
 		DifficultySettingsAnalyzer{},
+		ARCalibrationAnalyzer{},
+		CSPrecisionAnalyzer{},
 		ObjectDensityAnalyzer{},
 		BPMRangeAnalyzer{},
 		MapperRepetitionAnalyzer{},
@@ -250,9 +369,9 @@ func TestMetadataAnalyzers_RunTogetherInEngineWithoutInterference(t *testing.T) 
 		t.Fatalf("Run returned error: %v", err)
 	}
 
-	// 6 beatmaps x 2 beatmap-scoped analyzers + 3 categories x 2
-	// category-scoped analyzers = 18 Analyses.
-	if len(results) != 18 {
-		t.Errorf("len(results) = %d, want 18", len(results))
+	// 6 beatmaps x 4 beatmap-scoped analyzers + 3 categories x 2
+	// category-scoped analyzers = 30 Analyses.
+	if len(results) != 30 {
+		t.Errorf("len(results) = %d, want 30", len(results))
 	}
 }

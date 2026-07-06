@@ -1,6 +1,6 @@
 # Analysis Engine Specification
 
-Phase 5 deliverable. The Analysis Engine is the heart of the system (CLAUDE.md Identity) — this document defines the analyzer interface, the run pipeline, the result format, the scoring model, and the recommendation model. Implemented in `backend/internal/analysis` and `backend/internal/domain`.
+Phase 5 deliverable. The Analysis Engine is the heart of the system. This document defines the analyzer interface, the run pipeline, the result format, the scoring model, and the recommendation model. Implemented in `backend/internal/analysis` and `backend/internal/domain`.
 
 ## Analyzer interface
 

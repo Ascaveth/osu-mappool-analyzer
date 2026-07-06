@@ -3,6 +3,7 @@ package pattern
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -23,6 +24,16 @@ const (
 	snapToleranceRatio = 1.15 // allow 15% timing slack before breaking a run
 	burstMinLength     = 3
 	streamMinLength    = 7
+
+	// deathstreamMinLength marks a run as "deathstream"-scale: the osu!
+	// wiki calls unbroken streams at this length an endurance test rather
+	// than a rhythm/reading test, ranked only as an explicit, approved
+	// exception rather than by default. There is no official numeric
+	// cutoff in the wiki itself, so 32 notes (two full bars of unbroken
+	// 1/4-snap notes in 4/4) is this codebase's own stated convention,
+	// same as streamMinLength/burstMinLength above — revisable, not a
+	// fact about the beatmap.
+	deathstreamMinLength = 32
 )
 
 // StreamBurstAnalyzer detects runs of closely-spaced circles and
@@ -81,40 +92,94 @@ func (StreamBurstAnalyzer) Analyze(_ context.Context, in analysis.Input) (analys
 		}
 	}
 
+	var findings []domain.Finding
+	if longestRun >= deathstreamMinLength {
+		findings = append(findings, domain.Finding{
+			Severity:       domain.SeverityWarning,
+			Description:    fmt.Sprintf("longest unbroken run is %d notes, at or beyond the deathstream threshold (%d)", longestRun, deathstreamMinLength),
+			Reason:         "the osu! wiki treats unbroken streams at this length as an endurance test rather than a rhythm/reading test, and ranks them only as an explicit, approved exception rather than by default",
+			Recommendation: "confirm this run length is an intentional design choice for this slot rather than accidental overmapping",
+		})
+	}
+
 	return analysis.Result{Metrics: map[string]float64{
 		"burst_count":        float64(burstCount),
 		"stream_count":       float64(streamCount),
 		"longest_run_length": float64(longestRun),
-	}}, nil
+	}, Findings: findings}, nil
 }
 
-// runLengths groups consecutive circles into runs by inter-onset interval
+// groupRuns groups consecutive circles into runs by inter-onset interval
 // (IOI): a circle continues the current run when its IOI from the previous
 // circle is at or under the local snap threshold, otherwise the run ends
-// and a new one starts. It returns the length of every run found, in order.
-// Shared by StreamBurstAnalyzer and skillset classification
-// (see ComputeSkillsetProfile) so the two stay consistent; callers apply
-// their own length-to-classification thresholds.
-func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPoint, fallbackBeatLengthMs float64) []int {
+// and a new one starts. It returns the circles of every run found, in
+// order. Shared by StreamBurstAnalyzer and skillset classification (see
+// ComputeSkillsetProfile) so the two stay consistent; callers apply their
+// own length- or spacing-based classification on top.
+func groupRuns(circles []domain.HitObject, sortedTimingPoints []domain.TimingPoint, fallbackBeatLengthMs float64) [][]domain.HitObject {
 	if len(circles) == 0 {
 		return nil
 	}
-	var lengths []int
-	runLength := 1
+	var runs [][]domain.HitObject
+	current := []domain.HitObject{circles[0]}
 	cursor := timingPointCursor{}
 	for i := 1; i < len(circles); i++ {
 		ioi := circles[i].StartTime - circles[i-1].StartTime
 		beatLengthMs := cursor.beatLengthMs(sortedTimingPoints, circles[i-1].StartTime, fallbackBeatLengthMs)
 		snapThreshold := time.Duration(beatLengthMs / streamSnapDivisor * snapToleranceRatio * float64(time.Millisecond))
 		if ioi <= snapThreshold {
-			runLength++
+			current = append(current, circles[i])
 			continue
 		}
-		lengths = append(lengths, runLength)
-		runLength = 1
+		runs = append(runs, current)
+		current = []domain.HitObject{circles[i]}
 	}
-	lengths = append(lengths, runLength)
+	runs = append(runs, current)
+	return runs
+}
+
+// runLengths is a thin wrapper over groupRuns for callers that only need
+// run lengths, not the underlying circles.
+func runLengths(circles []domain.HitObject, sortedTimingPoints []domain.TimingPoint, fallbackBeatLengthMs float64) []int {
+	groups := groupRuns(circles, sortedTimingPoints, fallbackBeatLengthMs)
+	lengths := make([]int, len(groups))
+	for i, g := range groups {
+		lengths[i] = len(g)
+	}
 	return lengths
+}
+
+// spacingCV returns the coefficient of variation (stddev/mean) of
+// straight-line spacing between consecutive circles in run — the signal
+// that tells a clean, predictable jumpstream (low CV: the same spacing
+// repeated, an aim/endurance test no different in kind from a stream slot
+// that happens to have jumps in it) from an irregular one (high CV:
+// spacing shifts note-to-note, a pattern-adaptation test using stream
+// density as its vehicle). Returns 0 when run has fewer than two spacing
+// samples, or when every sample is zero (fully stacked notes have no
+// spacing to vary).
+func spacingCV(run []domain.HitObject) float64 {
+	if len(run) < 3 {
+		return 0
+	}
+	distances := make([]float64, 0, len(run)-1)
+	sum := 0.0
+	for i := 1; i < len(run); i++ {
+		d := distance(run[i-1], run[i])
+		distances = append(distances, d)
+		sum += d
+	}
+	mean := sum / float64(len(distances))
+	if mean == 0 {
+		return 0
+	}
+	variance := 0.0
+	for _, d := range distances {
+		diff := d - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(distances))
+	return math.Sqrt(variance) / mean
 }
 
 // timingPointCursor tracks the active uninherited beat length while
