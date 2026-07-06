@@ -18,6 +18,8 @@ import type { Tournament, Report } from "./types";
  * @param ar - Approach rate
  * @param od - Overall difficulty
  * @param bpm - Beatmap tempo
+ * @param cs - Circle size (defaulted for mockup entries that don't set it)
+ * @param hp - HP drain (defaulted for mockup entries that don't set it)
  * @returns A beatmap object containing the provided fields
  */
 function bm(
@@ -29,8 +31,10 @@ function bm(
   ar: number,
   od: number,
   bpm: number,
+  cs = 4,
+  hp = 5,
 ) {
-  return { id, title, artist, mapper, version, ar, od, bpm };
+  return { id, title, artist, mapper, version, ar, od, cs, hp, bpm };
 }
 
 export const tournament: Tournament = {

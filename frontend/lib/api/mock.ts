@@ -78,6 +78,8 @@ function parseOsu(text: string): Omit<Beatmap, "id"> {
     version: get("Version") || "Unknown Difficulty",
     ar: num("ApproachRate"),
     od: num("OverallDifficulty"),
+    cs: num("CircleSize"),
+    hp: num("HPDrainRate"),
     bpm,
     coverUrl,
   };

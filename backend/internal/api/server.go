@@ -30,6 +30,15 @@ type Server struct {
 	// Enricher as a no-op, not an error.
 	Enricher Enricher
 
+	// StarRatings is read when serving a Slot's effective_difficulty, to
+	// report the real, mod-specific Star Rating fetched at import time
+	// (internal/enrich) alongside the arithmetic AR/OD/CS/HP/BPM transform
+	// (see modmap.EffectiveDifficultyFor) — Star Rating itself can't be
+	// recomputed locally the way those can. Nil is a valid, expected state
+	// (star rating fetching disabled): handlers must treat it as "no Star
+	// Rating data available", not an error.
+	StarRatings storage.StarRatingRepository
+
 	// Now is the clock used where a handler needs the current time
 	// independent of the Engine (e.g. nothing today, reserved for parity
 	// with analysis.Engine.Now). Defaults to time.Now.
@@ -37,13 +46,15 @@ type Server struct {
 }
 
 // NewServer returns a Server ready to be wired into a router via
-// NewRouter. enricher may be nil (star rating fetching disabled).
-func NewServer(tournaments storage.TournamentRepository, beatmaps storage.BeatmapRepository, engine *analysis.Engine, enricher Enricher) *Server {
+// NewRouter. enricher and starRatings may be nil (star rating fetching
+// disabled).
+func NewServer(tournaments storage.TournamentRepository, beatmaps storage.BeatmapRepository, engine *analysis.Engine, enricher Enricher, starRatings storage.StarRatingRepository) *Server {
 	return &Server{
 		Tournaments: tournaments,
 		Beatmaps:    beatmaps,
 		Engine:      engine,
 		Enricher:    enricher,
+		StarRatings: starRatings,
 		Now:         time.Now,
 	}
 }

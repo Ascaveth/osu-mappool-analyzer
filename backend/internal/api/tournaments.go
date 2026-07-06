@@ -68,7 +68,7 @@ func (s *Server) CreateTournament(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Location", "/v1/tournaments/"+saved.ID)
-	writeJSON(w, http.StatusCreated, toTournamentDTO(saved))
+	writeJSON(w, http.StatusCreated, toTournamentDTO(r.Context(), saved, s.StarRatings))
 }
 
 func configurationIssuesDetail(issues []domain.ConfigurationIssue) string {
@@ -92,7 +92,7 @@ func (s *Server) GetTournament(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toTournamentDTO(t))
+	writeJSON(w, http.StatusOK, toTournamentDTO(r.Context(), t, s.StarRatings))
 }
 
 // UpdateTournament handles PATCH /tournaments/{tournamentId}.
@@ -122,7 +122,7 @@ func (s *Server) UpdateTournament(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toTournamentDTO(updated))
+	writeJSON(w, http.StatusOK, toTournamentDTO(r.Context(), updated, s.StarRatings))
 }
 
 // DeleteTournament handles DELETE /tournaments/{tournamentId}.

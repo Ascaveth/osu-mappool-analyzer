@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/modmap"
 )
 
 // BPMRangeAnalyzer reports the BPM spread across a Category's filled
@@ -16,6 +17,13 @@ import (
 // filled beatmap in the category sharing the exact same BPM. Anything
 // short of that is reported as a metric for a human (or a future,
 // better-justified analyzer) to interpret.
+//
+// BPM is read as the category's own fixed mod would actually play it
+// (modmap.EffectiveDifficultyFor) — e.g. a Double Time category plays
+// every one of its beatmaps at 1.5x raw BPM, and comparing raw BPM values
+// there would judge a diversity axis players never actually experience.
+// Categories with no single fixed mod (FreeMod, Tiebreaker, unrecognized
+// names) fall back to raw BPM, same as before.
 type BPMRangeAnalyzer struct{}
 
 func (BPMRangeAnalyzer) Name() string { return "bpm-range-analyzer" }
@@ -28,10 +36,16 @@ func (BPMRangeAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis.
 		return analysis.Result{}, fmt.Errorf("metadata: category %q not found in tournament", in.Scope.ID)
 	}
 
+	mods, ok := modmap.FromCategoryName(category.Name)
+	if !ok {
+		mods = modmap.NoMod
+	}
+
 	var bpms []float64
 	for _, slot := range category.Slots {
 		if slot.Beatmap != nil {
-			bpms = append(bpms, slot.Beatmap.BPM)
+			eff := modmap.EffectiveDifficultyFor(slot.Beatmap.AR, slot.Beatmap.OD, slot.Beatmap.CS, slot.Beatmap.HP, slot.Beatmap.BPM, slot.Beatmap.LengthSeconds, mods)
+			bpms = append(bpms, eff.BPM)
 		}
 	}
 

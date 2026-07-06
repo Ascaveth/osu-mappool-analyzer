@@ -635,6 +635,32 @@ components:
           type: [string, "null"]
           format: uuid
           description: Null when the slot is unfilled — a valid, expected pool state (docs/06-domain-model.md).
+        effective_difficulty:
+          type: [object, "null"]
+          readOnly: true
+          description: >
+            The slot's beatmap AR/OD/CS/HP/BPM/length as they actually play
+            under this slot's Category's fixed mod (e.g. HR scales
+            CS/AR/OD/HP, DT scales BPM/length and rescales AR/OD's timing
+            windows) — not the beatmap's raw .osu values. Null when the
+            slot is unfilled, or its Category has no single fixed mod
+            (FreeMod, Tiebreaker, or an unrecognized name).
+          properties:
+            ar: { type: number }
+            od: { type: number }
+            cs: { type: number }
+            hp: { type: number }
+            bpm: { type: number }
+            length_seconds: { type: integer }
+            star_rating:
+              type: [number, "null"]
+              description: >
+                Real, mod-specific Star Rating fetched from the osu! API at
+                import time (internal/enrich) for this slot's fixed mod —
+                unlike the other fields here, not something this arithmetic
+                transform can compute itself. Null when star rating
+                fetching is disabled or this mod combination hasn't been
+                enriched yet.
 
     Beatmap:
       type: object

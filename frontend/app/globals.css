@@ -340,6 +340,8 @@ body {
 }
 
 .slot-row {
+  position: relative;
+  isolation: isolate; /* scopes .slot-row--cover::before's z-index: -1 to this row, not some distant ancestor's stacking context */
   flex: 1;
   min-width: 0;
   display: grid;
@@ -351,6 +353,34 @@ body {
   margin-bottom: 0.4rem;
   border-radius: 4px;
   background-repeat: no-repeat;
+  overflow: hidden;
+}
+
+/* Cover-photo rows get their cover art softly blurred (not hidden —
+   still recognizable) so the title/code text sitting on top of it stays
+   legible without needing its own opaque .slot-chip backing everywhere.
+   Built as a second copy of the row's own cover image
+   (background-image: inherit, pulling slotAccentStyle's inline
+   background) blurred with `filter` rather than `backdrop-filter`: this
+   project's build pipeline strips the unprefixed `backdrop-filter` from
+   every rule (Turbopack/lightningcss only emits
+   `-webkit-backdrop-filter`), and `filter` blurs its own painted content
+   directly rather than depending on that. Inset -16px grows this layer's
+   box past the row on every side (background-size: cover re-fits to that
+   bigger box) so blur's own to-transparent edge falloff lands outside the
+   row's `overflow: hidden`, instead of showing as a halo along the row's
+   top/bottom. */
+.slot-row--cover::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  z-index: -1; /* above the row's own cover-image background, below its text/button children */
+  background-image: inherit;
+  background-size: inherit;
+  background-position: inherit;
+  background-repeat: no-repeat;
+  filter: blur(4px);
+  pointer-events: none;
 }
 
 /* Pool builder's row additionally carries an inline confirm/clear action. */

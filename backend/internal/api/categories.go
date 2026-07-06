@@ -19,5 +19,5 @@ func (s *Server) GetCategory(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toCategoryDTO(*cat))
+	writeJSON(w, http.StatusOK, toCategoryDTO(r.Context(), *cat, s.StarRatings))
 }

@@ -16,7 +16,7 @@ func newTestServer() *Server {
 	} {
 		_ = engine.Register(a)
 	}
-	return NewServer(memory.NewTournamentRepository(), memory.NewBeatmapRepository(), engine, nil)
+	return NewServer(memory.NewTournamentRepository(), memory.NewBeatmapRepository(), engine, nil, memory.NewStarRatingRepository())
 }
 
 const exampleTournamentConfigJSON = `{

@@ -1,6 +1,13 @@
 import type { Citation, Stage } from "@/lib/types";
 import { MarginNote } from "./MarginNote";
-import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
+import {
+  formatBeatmapLabel,
+  formatBpm,
+  formatStarRating,
+  formatStat,
+  modAccentColor,
+  slotAccentStyle,
+} from "@/lib/beatmap-format";
 import { sortBySeverity } from "@/lib/citation-labels";
 
 /**
@@ -62,7 +69,7 @@ export function StageSection({
               const hasCover = !!slot.beatmap?.coverUrl;
               return (
                 <div
-                  className="slot-row"
+                  className={`slot-row${hasCover ? " slot-row--cover" : ""}`}
                   key={slot.id}
                   style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
                 >
@@ -74,8 +81,11 @@ export function StageSection({
                   </span>
                   {slot.beatmap && (
                     <span className={`slot-stats${hasCover ? " slot-chip" : ""}`}>
-                      AR {slot.beatmap.ar.toFixed(1)} · OD {slot.beatmap.od.toFixed(1)} ·{" "}
-                      {slot.beatmap.bpm} BPM
+                      {formatStarRating(slot.effectiveDifficulty?.starRating)} ·{" "}
+                      {formatBpm(slot.beatmap.bpm, slot.effectiveDifficulty?.bpm)} ·{" "}
+                      {formatStat("CS", slot.beatmap.cs, slot.effectiveDifficulty?.cs)} ·{" "}
+                      {formatStat("AR", slot.beatmap.ar, slot.effectiveDifficulty?.ar)} ·{" "}
+                      {formatStat("OD", slot.beatmap.od, slot.effectiveDifficulty?.od)}
                     </span>
                   )}
                 </div>

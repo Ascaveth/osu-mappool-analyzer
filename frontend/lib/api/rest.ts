@@ -9,6 +9,7 @@ import type {
   Category,
   Slot,
   Beatmap,
+  EffectiveDifficulty,
   Report,
   Citation,
   Finding,
@@ -24,10 +25,21 @@ interface WireProblem {
   detail?: string;
 }
 
+interface WireEffectiveDifficulty {
+  ar: number;
+  od: number;
+  cs: number;
+  hp: number;
+  bpm: number;
+  length_seconds: number;
+  star_rating: number | null;
+}
+
 interface WireSlot {
   id: string;
   position: number;
   beatmap_id: string | null;
+  effective_difficulty: WireEffectiveDifficulty | null;
 }
 
 interface WireCategory {
@@ -131,8 +143,23 @@ function toBeatmap(w: WireBeatmap, coverUrl?: string): Beatmap {
     version: w.version,
     ar: w.ar,
     od: w.od,
+    cs: w.cs,
+    hp: w.hp,
     bpm: w.bpm,
     coverUrl,
+  };
+}
+
+function toEffectiveDifficulty(w: WireEffectiveDifficulty | null): EffectiveDifficulty | null {
+  if (!w) return null;
+  return {
+    ar: w.ar,
+    od: w.od,
+    cs: w.cs,
+    hp: w.hp,
+    bpm: w.bpm,
+    lengthSeconds: w.length_seconds,
+    starRating: w.star_rating,
   };
 }
 
@@ -141,6 +168,7 @@ function toSlot(w: WireSlot, categoryName: string, beatmapsById: Map<string, Bea
     id: w.id,
     code: `${categoryName}${w.position}`,
     beatmap: w.beatmap_id ? (beatmapsById.get(w.beatmap_id) ?? null) : null,
+    effectiveDifficulty: toEffectiveDifficulty(w.effective_difficulty),
   };
 }
 
@@ -326,12 +354,17 @@ export function createRestClient(baseUrl: string): ApiClient {
       // can't be derived here — callers (see pool/page.tsx) always re-fetch
       // the whole Tournament via getTournament after assigning, which does
       // have that context, and don't use this return value's `code`.
-      return { id: wire.id, code: "", beatmap: toBeatmap(beatmapWire, beatmapCovers.get(beatmapId)) };
+      return {
+        id: wire.id,
+        code: "",
+        beatmap: toBeatmap(beatmapWire, beatmapCovers.get(beatmapId)),
+        effectiveDifficulty: null,
+      };
     },
 
     async clearBeatmap(slotId: string): Promise<Slot> {
       await request(baseUrl, `/slots/${slotId}/beatmap`, { method: "DELETE" });
-      return { id: slotId, code: "", beatmap: null };
+      return { id: slotId, code: "", beatmap: null, effectiveDifficulty: null };
     },
 
     async getReport(tournamentId: string): Promise<Report> {

@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Tournament } from "@/lib/types";
-import { formatBeatmapLabel, modAccentColor, slotAccentStyle } from "@/lib/beatmap-format";
+import {
+  formatBeatmapLabel,
+  formatBpm,
+  formatStarRating,
+  formatStat,
+  modAccentColor,
+  slotAccentStyle,
+} from "@/lib/beatmap-format";
 import { ClipboardCheck, Trash2 } from "lucide-react";
 
 export default function PoolPage({
@@ -227,7 +234,7 @@ export default function PoolPage({
                   <div key={slot.id}>
                     <div className="slot-line">
                       <div
-                        className={`slot-row slot-row--editable${
+                        className={`slot-row slot-row--editable${hasCover ? " slot-row--cover" : ""}${
                           slotImporting[slot.id] ? " slot-row--loading" : ""
                         }`}
                         style={slotAccentStyle(slot.code, slot.beatmap?.coverUrl)}
@@ -242,9 +249,11 @@ export default function PoolPage({
                               {formatBeatmapLabel(slot.beatmap)}
                             </span>
                             <span className={`slot-stats${hasCover ? " slot-chip" : ""}`}>
-                              AR {slot.beatmap.ar.toFixed(1)} · OD{" "}
-                              {slot.beatmap.od.toFixed(1)} ·{" "}
-                              {slot.beatmap.bpm} BPM
+                              {formatStarRating(slot.effectiveDifficulty?.starRating)} ·{" "}
+                              {formatBpm(slot.beatmap.bpm, slot.effectiveDifficulty?.bpm)} ·{" "}
+                              {formatStat("CS", slot.beatmap.cs, slot.effectiveDifficulty?.cs)} ·{" "}
+                              {formatStat("AR", slot.beatmap.ar, slot.effectiveDifficulty?.ar)} ·{" "}
+                              {formatStat("OD", slot.beatmap.od, slot.effectiveDifficulty?.od)}
                             </span>
                             <button
                               className="btn btn-ghost pool-slot-clear"
