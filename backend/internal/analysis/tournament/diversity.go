@@ -81,17 +81,30 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 	metrics["mapper_diversity_ratio"] = float64(len(mappers)) / float64(filled)
 	metrics["song_diversity_ratio"] = float64(len(songCounts)) / float64(filled)
 
-	bpmMin, bpmMax := bpmValues[0], bpmValues[0]
-	for _, b := range bpmValues[1:] {
-		if b < bpmMin {
-			bpmMin = b
-		}
-		if b > bpmMax {
-			bpmMax = b
+	// Unresolved BPM (<= 0, mirroring ARCalibrationAnalyzer's guard) is not a
+	// tempo value and must not count toward the clustered-tempo judgment.
+	var positiveBpms []float64
+	for _, b := range bpmValues {
+		if b > 0 {
+			positiveBpms = append(positiveBpms, b)
 		}
 	}
-	bpmRange := bpmMax - bpmMin
-	metrics["bpm_range"] = bpmRange
+
+	var bpmRange float64
+	hasBpmRange := len(positiveBpms) > 0
+	if hasBpmRange {
+		bpmMin, bpmMax := positiveBpms[0], positiveBpms[0]
+		for _, b := range positiveBpms[1:] {
+			if b < bpmMin {
+				bpmMin = b
+			}
+			if b > bpmMax {
+				bpmMax = b
+			}
+		}
+		bpmRange = bpmMax - bpmMin
+		metrics["bpm_range"] = bpmRange
+	}
 
 	var findings []domain.Finding
 	duplicates := filled - len(songCounts)
@@ -104,7 +117,7 @@ func (DiversityAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis
 		})
 	}
 
-	if filled >= minSlotsForBpmClusterJudgment && bpmRange < bpmClusterRangeThreshold {
+	if hasBpmRange && filled >= minSlotsForBpmClusterJudgment && bpmRange < bpmClusterRangeThreshold {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
 			Description:    fmt.Sprintf("this stage's BPM values cluster within a %.0f BPM range across all categories", bpmRange),

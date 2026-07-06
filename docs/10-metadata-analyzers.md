@@ -41,7 +41,7 @@ Reports `bpm_min`, `bpm_max`, `bpm_range`, `bpm_mean`, and `filled_slots` for a 
 
 ### MapperRepetitionAnalyzer (Category scope)
 
-Reports `distinct_mappers` and `top_mapper_share` for a category. Raises a **Warning** when one mapper supplies more than 50% of a category's filled slots (with more than one slot filled). The 50% line is principled, not arbitrary: below it, no single mapper outweighs everyone else combined; at or above it, one mapper's style necessarily does. This directly implements the "overused mappers" validation case named in CLAUDE.md.
+Reports `distinct_mappers` and `top_mapper_share` for a category. Raises a **Warning** when one mapper supplies more than 50% of a category's filled slots (with more than one slot filled). The 50% line is principled, not arbitrary: below it, no single mapper outweighs everyone else combined; at or above it, one mapper's style necessarily does.
 
 ## Design philosophy: report, don't invent thresholds
 

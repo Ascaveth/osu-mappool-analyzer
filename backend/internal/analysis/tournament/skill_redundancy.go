@@ -127,8 +127,9 @@ func rmsDistance(a, b skillProfileVector) float64 {
 }
 
 type redundantPair struct {
-	slotAID, slotBID string
-	distance         float64
+	slotAID, slotBID     string
+	categoryA, categoryB string
+	distance             float64
 }
 
 func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis.Result, error) {
@@ -138,6 +139,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	}
 
 	var slotIDs []string
+	var categoryNames []string
 	var vectors []skillProfileVector
 	for _, c := range stage.Categories {
 		for _, slot := range c.Slots {
@@ -145,6 +147,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 				continue
 			}
 			slotIDs = append(slotIDs, slot.ID)
+			categoryNames = append(categoryNames, c.Name)
 			vectors = append(vectors, vectorFromProfile(pattern.ComputeSkillsetProfile(slot.Beatmap)))
 		}
 	}
@@ -165,7 +168,11 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 				closest = d
 			}
 			if d < redundancySimilarityThreshold {
-				pairs = append(pairs, redundantPair{slotAID: slotIDs[i], slotBID: slotIDs[j], distance: d})
+				pairs = append(pairs, redundantPair{
+					slotAID: slotIDs[i], slotBID: slotIDs[j],
+					categoryA: categoryNames[i], categoryB: categoryNames[j],
+					distance: d,
+				})
 			}
 		}
 	}
@@ -196,7 +203,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	for _, p := range pairs[:reportCount] {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
-			Description:    fmt.Sprintf("slot %q and slot %q test a near-identical mechanical skill profile despite different category labels", p.slotAID, p.slotBID),
+			Description:    fmt.Sprintf("slot %q (%s) and slot %q (%s) test a near-identical mechanical skill profile despite different category labels", p.slotAID, p.categoryA, p.slotBID, p.categoryB),
 			Reason:         "a map can be individually well-built and correctly calibrated yet still burn a slot the pool didn't need, if it tests the same skill the same way another slot already does",
 			Recommendation: "replace one of these beatmaps with a map that covers a different mechanical skill, or a different way of testing the same skill",
 		})

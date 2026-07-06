@@ -405,6 +405,36 @@ func TestDiversityAnalyzer_SpreadBPMAcrossStageProducesNoClusterFinding(t *testi
 
 // --- SkillCoverageAnalyzer ---
 
+func TestDiversityAnalyzer_ZeroBPMExcludedFromClusterJudgment(t *testing.T) {
+	tournament := &domain.Tournament{
+		ID: "t-1",
+		Stages: []domain.Stage{{
+			ID: "stage-1", Order: 1,
+			Categories: []domain.Category{
+				{ID: "cat-a", Order: 1, Slots: []domain.Slot{slot("s1", bm("bm1", "M1", "A1", "S1", 9, 8, 0.3, 0))}},
+				{ID: "cat-b", Order: 2, Slots: []domain.Slot{slot("s2", bm("bm2", "M2", "A2", "S2", 9, 8, 0.3, 0))}},
+				{ID: "cat-c", Order: 3, Slots: []domain.Slot{slot("s3", bm("bm3", "M3", "A3", "S3", 9, 8, 0.3, 0))}},
+			},
+		}},
+	}
+
+	result, err := DiversityAnalyzer{}.Analyze(context.Background(), analysis.Input{
+		Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage-1"},
+	})
+	if err != nil {
+		t.Fatalf("Analyze returned error: %v", err)
+	}
+	if _, ok := result.Metrics["bpm_range"]; ok {
+		t.Errorf("bpm_range = %v, want metric absent when no positive BPMs exist", result.Metrics["bpm_range"])
+	}
+
+	for _, f := range result.Findings {
+		if strings.Contains(f.Description, "cluster") {
+			t.Error("did not expect a BPM-clustering finding when all slots have unresolved (0) BPM")
+		}
+	}
+}
+
 func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
 	tournament := &domain.Tournament{
 		ID: "t-1",

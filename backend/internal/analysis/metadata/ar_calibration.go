@@ -59,7 +59,7 @@ func (ARCalibrationAnalyzer) Analyze(_ context.Context, in analysis.Input) (anal
 	}
 
 	if bm.BPM <= 0 {
-		return analysis.Result{}, nil
+		return analysis.Result{Metrics: map[string]float64{"ar_beat_ratio": 0}}, nil
 	}
 
 	beatLength := 60000.0 / bm.BPM

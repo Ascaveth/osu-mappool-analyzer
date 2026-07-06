@@ -42,7 +42,7 @@ The tournament-quality counterpart to Phase 6's `BPMRangeAnalyzer`, which only e
 
 Reports BPM, mapper, and song diversity across an **entire stage** (all categories combined), catching duplication that's invisible to a single-category view — a stage can have perfectly fine within-category diversity while still reusing the same song or mapper across two different categories. Two findings:
 
-- **Duplicate song** — fully objective: identical Artist+Title (exact string match) appearing in more than one slot within the same stage — directly implementing CLAUDE.md's "Duplicate characteristics" validation example.
+- **Duplicate song** — fully objective: identical Artist+Title (exact string match) appearing in more than one slot within the same stage.
 - **BPM clustering** — Warning when a stage's overall BPM range (across every filled slot, all categories combined) falls below `bpmClusterRangeThreshold` (named, documented calibration constant in `diversity.go`), with at least `minSlotsForBpmClusterJudgment` filled slots. This is the stage-wide, pool-balance-level counterpart to `metadata.BPMRangeAnalyzer`'s per-category *exact-zero-variance* check ([docs/10-metadata-analyzers.md](10-metadata-analyzers.md)): the metadata-feedback framework frames BPM complaints as a pool-wide distribution concern rather than a per-map fault, so the softer "everything sits near the same tempo" pattern belongs here, at the scope that can see across categories, rather than in the metadata package.
 
 ### SkillCoverageAnalyzer (Stage scope)

@@ -256,8 +256,8 @@ func TestARCalibrationAnalyzer_FlagsLooseWindowFromLowARFastBPM(t *testing.T) {
 func TestARCalibrationAnalyzer_FlagsTightWindowFromHighARLowBPM(t *testing.T) {
 	tournament := buildTournament()
 	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
-	target.AR = 9.9 // approach time 555ms
-	target.BPM = 90 // beatLength 666ms -> ratio 0.83 (below arRatioLowThreshold)
+	target.AR = 9.9 // approach time 465ms
+	target.BPM = 90 // beatLength 667ms -> ratio ~0.70 (below arRatioLowThreshold)
 
 	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
 		Tournament: tournament,
@@ -274,8 +274,8 @@ func TestARCalibrationAnalyzer_FlagsTightWindowFromHighARLowBPM(t *testing.T) {
 func TestARCalibrationAnalyzer_NormalRatioProducesNoFindings(t *testing.T) {
 	tournament := buildTournament()
 	target := tournament.Stages[0].Categories[0].Slots[0].Beatmap
-	target.AR = 9.3  // approach time 645ms
-	target.BPM = 180 // beatLength 333ms -> ratio ~1.94, within [1.2, 4.0]
+	target.AR = 9.3  // approach time 555ms
+	target.BPM = 180 // beatLength 333ms -> ratio ~1.67, within [1.2, 4.0]
 
 	result, err := ARCalibrationAnalyzer{}.Analyze(context.Background(), analysis.Input{
 		Tournament: tournament,
