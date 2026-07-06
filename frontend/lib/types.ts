@@ -87,9 +87,11 @@ export interface Slot {
   id: string;
   code: string; // e.g. "NM1", "HD2" — the slot's mod-category shorthand, as mappoolers write it
   beatmap: Beatmap | null;
-  // Absent (not just null) on mock/sample data and on the couple of REST
-  // client calls that don't have category context (see rest.ts's
-  // assignBeatmap/clearBeatmap) — always present from a real getTournament.
+  // Absent (the key itself missing) only on mock/sample data. Null on the
+  // couple of REST client calls that don't have category context (see
+  // rest.ts's assignBeatmap/clearBeatmap, which explicitly set it to
+  // null) — always present (and non-null when applicable) from a real
+  // getTournament.
   effectiveDifficulty?: EffectiveDifficulty | null;
 }
 

@@ -73,14 +73,17 @@ func (ARCalibrationAnalyzer) Analyze(_ context.Context, in analysis.Input) (anal
 	for _, p := range placements {
 		eff := modmap.EffectiveDifficultyFor(bm.AR, bm.OD, bm.CS, bm.HP, bm.BPM, bm.LengthSeconds, p.mods)
 		if eff.BPM <= 0 {
-			metrics["ar_beat_ratio"] = 0
 			continue
 		}
 
 		beatLength := 60000.0 / eff.BPM
 		approach := approachTimeMs(eff.AR)
 		ratio := approach / beatLength
-		metrics["ar_beat_ratio"] = ratio
+		metricKey := "ar_beat_ratio"
+		if p.categoryName != "" {
+			metricKey = fmt.Sprintf("ar_beat_ratio[%s]", p.categoryName)
+		}
+		metrics[metricKey] = ratio
 
 		label := arLabel(p.categoryName, eff.AR, eff.BPM, bm.AR, bm.BPM)
 		switch {
