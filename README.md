@@ -49,11 +49,7 @@
 
 ## About The Project
 
-Feed it a tournament's stages and beatmaps, and it runs a set of analyzers over the pool. The things a mappooler actually needs to sanity-check before a pool goes live.
-
-This isn't a player stats site, and it's not another leaderboard clone. The mappools itself is the subject.
-
-Two pieces, wired together:
+Started as a idea, trying to make balancing and mappooling great again with the help of automations and reducing burdens to the playtester or mappooler so both playtester or mappooler arranging mappools takes less time.
 
 - **Backend** (`backend/`): a Go API with a working analysis engine behind it. Tournaments, stages, categories, slots, beatmaps all modeled and exposed over REST.
 - **Frontend** (`frontend/`): a Next.js app. The tournament creation flow, pool editor, and report view (`app/tournaments/new`, `app/tournaments/[id]/pool`, `app/tournaments/[id]/report`) call the backend through a real REST client in `lib/api/`. The root page (`app/page.tsx`) is a standalone demo that still renders off `lib/sample-data.ts`.
