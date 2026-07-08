@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { CreateStageInput, CreateCategoryInput } from "@/lib/api";
 import { modAccentColor } from "@/lib/beatmap-format";
+import { KNOWN_MODS } from "@/lib/mods";
 
 interface CatDraft {
   _id: string;
@@ -26,15 +27,6 @@ interface ProofNote {
   source: string;
 }
 
-const MOD_OPTIONS: { value: string; label: string }[] = [
-  { value: "NM", label: "NM — No Mod" },
-  { value: "HD", label: "HD — Hidden" },
-  { value: "HR", label: "HR — Hard Rock" },
-  { value: "DT", label: "DT — Double Time" },
-  { value: "FM", label: "FM — Free Mod" },
-  { value: "TB", label: "TB — Tiebreaker" },
-];
-
 function draftId() {
   return Math.random().toString(36).slice(2);
 }
@@ -48,6 +40,7 @@ function newStage(): StageDraft {
 }
 
 function hasDuplicateMods(categories: CatDraft[]): boolean {
+  if (categories.some((c) => c.modPrefix.trim().length === 0)) return true;
   return new Set(categories.map((c) => c.modPrefix)).size !== categories.length;
 }
 
@@ -117,7 +110,8 @@ export default function NewTournamentPage() {
       ),
     );
 
-  const onModChange = (sid: string, cid: string, modPrefix: string) => {
+  const onModChange = (sid: string, cid: string, rawModPrefix: string) => {
+    const modPrefix = rawModPrefix.toUpperCase();
     const patch: Partial<CatDraft> = { modPrefix };
     if (modPrefix === "TB") patch.slotCount = 1;
     updateCat(sid, cid, patch);
@@ -225,6 +219,16 @@ export default function NewTournamentPage() {
         <h1 className="masthead-title">Tournament Setup</h1>
       </div>
 
+      {/* Suggestions only — tournament structures are user-defined, so any
+          mod prefix typed into the field above is accepted as-is. */}
+      <datalist id="mod-category-options">
+        {KNOWN_MODS.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </datalist>
+
       <div className="setup-layout">
         <div>
           <div className="field">
@@ -309,9 +313,11 @@ export default function NewTournamentPage() {
                               style={{ background: dotColor }}
                             />
                           )}
-                          <select
-                            className="field-select"
+                          <input
+                            className="field-input"
+                            list="mod-category-options"
                             aria-label="Mod category"
+                            placeholder="NM"
                             value={cat.modPrefix}
                             onChange={(e) =>
                               onModChange(stage._id, cat._id, e.target.value)
@@ -319,13 +325,7 @@ export default function NewTournamentPage() {
                             style={{
                               borderColor: isDupMod ? "var(--mark)" : undefined,
                             }}
-                          >
-                            {MOD_OPTIONS.map((m) => (
-                              <option key={m.value} value={m.value}>
-                                {m.label}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                         <div className="inline-field">
                           <input

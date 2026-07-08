@@ -1,17 +1,9 @@
 import type { Tournament, Beatmap, Slot, Report, Stage, Category, Citation } from "@/lib/types";
+import { modLabel } from "@/lib/mods";
 import type { ApiClient } from "./client";
 import type { CreateTournamentInput } from "./types";
 
 const STORAGE_KEY = "osu-analyzer-mock";
-
-const MOD_LABELS: Record<string, string> = {
-  NM: "No Mod",
-  HD: "Hidden",
-  HR: "Hard Rock",
-  DT: "Double Time",
-  FM: "Free Mod",
-  TB: "Tiebreaker",
-};
 
 interface Store {
   tournaments: Record<string, Tournament>;
@@ -129,7 +121,7 @@ export function createMockClient(): ApiClient {
           projectedStarRating: st.projectedStarRating ?? null,
           categories: st.categories.map((cat): Category => ({
             id: uid(),
-            name: MOD_LABELS[cat.modPrefix] ?? cat.modPrefix,
+            name: modLabel(cat.modPrefix),
             order: cat.order,
             slots: Array.from({ length: cat.slotCount }, (_, i) => ({
               id: uid(),

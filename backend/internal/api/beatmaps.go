@@ -78,11 +78,23 @@ func (s *Server) ListBeatmaps(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, listResponse[beatmapDTO]{Data: data, Pagination: cursorPage})
 }
 
+// maxBeatmapUploadBytes bounds the size of an uploaded .osu file. Real
+// beatmap files are KB-scale; this is generous headroom while still
+// preventing an unbounded upload from exhausting server memory.
+const maxBeatmapUploadBytes = 2 << 20 // 2MB
+
 // ImportBeatmap handles POST /beatmaps.
 func (s *Server) ImportBeatmap(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBeatmapUploadBytes)
+
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		writeBadRequest(w, "missing multipart field \"file\": "+err.Error())
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeProblem(w, http.StatusRequestEntityTooLarge, "Payload Too Large", "uploaded file exceeds the size limit")
+			return
+		}
+		writeBadRequest(w, "missing or invalid multipart field \"file\": "+err.Error())
 		return
 	}
 	defer file.Close()

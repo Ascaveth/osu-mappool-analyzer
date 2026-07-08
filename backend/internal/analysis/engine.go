@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
@@ -63,6 +64,14 @@ type Engine struct {
 	// Now is the clock used to timestamp generated Analyses. Defaults to
 	// time.Now; overridable in tests for deterministic assertions.
 	Now func() time.Time
+
+	// cacheMu guards cache. SourceHash uniquely identifies an (analyzer,
+	// scope, content) triple (docs/04 Architecture Principle 6), so a
+	// cache hit is guaranteed to be a reproduction of what Analyze would
+	// return — this turns repeated requests against unchanged tournament
+	// data from a full analyzer re-run into a hash lookup.
+	cacheMu sync.RWMutex
+	cache   map[string]domain.Analysis
 }
 
 // NewEngine returns an empty Engine ready for analyzer registration.
@@ -70,6 +79,7 @@ func NewEngine() *Engine {
 	return &Engine{
 		analyzers: map[string]Analyzer{},
 		Now:       time.Now,
+		cache:     map[string]domain.Analysis{},
 	}
 }
 
@@ -121,6 +131,12 @@ loop:
 				break loop
 			}
 
+			hash := sourceHash(tournament, scope, name)
+			if cached, ok := e.getCached(hash); ok {
+				results = append(results, cached)
+				continue
+			}
+
 			result, err := analyzer.Analyze(ctx, Input{Tournament: tournament, Scope: scope})
 			if err != nil {
 				errs = append(errs, fmt.Errorf("analyzer %q (scope %s/%s): %w", name, scope.Type, scope.ID, err))
@@ -131,15 +147,17 @@ loop:
 				continue
 			}
 
-			results = append(results, domain.Analysis{
+			analysis := domain.Analysis{
 				AnalyzerName: name,
 				Scope:        scope,
-				SourceHash:   sourceHash(tournament, scope, name),
+				SourceHash:   hash,
 				GeneratedAt:  e.Now(),
 				Score:        result.Score,
 				Metrics:      result.Metrics,
 				Findings:     result.Findings,
-			})
+			}
+			e.setCached(hash, analysis)
+			results = append(results, analysis)
 		}
 	}
 
@@ -151,6 +169,51 @@ loop:
 	})
 
 	return results, errors.Join(errs...)
+}
+
+// getCached returns a cached Analysis for hash, along with a defensive
+// copy of its Metrics map and Findings slice so a caller mutating the
+// returned value can never corrupt the cache entry (or another caller's
+// previously-returned copy) through it.
+func (e *Engine) getCached(hash string) (domain.Analysis, bool) {
+	e.cacheMu.RLock()
+	a, ok := e.cache[hash]
+	e.cacheMu.RUnlock()
+	if !ok {
+		return domain.Analysis{}, false
+	}
+	return cloneAnalysis(a), true
+}
+
+// setCached stores a defensive copy of a in the cache, keyed by hash.
+func (e *Engine) setCached(hash string, a domain.Analysis) {
+	e.cacheMu.Lock()
+	e.cache[hash] = cloneAnalysis(a)
+	e.cacheMu.Unlock()
+}
+
+func cloneAnalysis(a domain.Analysis) domain.Analysis {
+	clone := a
+	if a.Metrics != nil {
+		clone.Metrics = make(map[string]float64, len(a.Metrics))
+		for k, v := range a.Metrics {
+			clone.Metrics[k] = v
+		}
+	}
+	if a.Findings != nil {
+		clone.Findings = make([]domain.Finding, len(a.Findings))
+		for i, f := range a.Findings {
+			if f.Metrics != nil {
+				m := make(map[string]float64, len(f.Metrics))
+				for k, v := range f.Metrics {
+					m[k] = v
+				}
+				f.Metrics = m
+			}
+			clone.Findings[i] = f
+		}
+	}
+	return clone
 }
 
 // validateFindings enforces docs/06-domain-model.md's domain rule that
