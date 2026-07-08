@@ -200,7 +200,19 @@ func cloneAnalysis(a domain.Analysis) domain.Analysis {
 			clone.Metrics[k] = v
 		}
 	}
-	clone.Findings = append([]domain.Finding(nil), a.Findings...)
+	if a.Findings != nil {
+		clone.Findings = make([]domain.Finding, len(a.Findings))
+		for i, f := range a.Findings {
+			if f.Metrics != nil {
+				m := make(map[string]float64, len(f.Metrics))
+				for k, v := range f.Metrics {
+					m[k] = v
+				}
+				f.Metrics = m
+			}
+			clone.Findings[i] = f
+		}
+	}
 	return clone
 }
 

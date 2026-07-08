@@ -40,6 +40,7 @@ function newStage(): StageDraft {
 }
 
 function hasDuplicateMods(categories: CatDraft[]): boolean {
+  if (categories.some((c) => c.modPrefix.trim().length === 0)) return true;
   return new Set(categories.map((c) => c.modPrefix)).size !== categories.length;
 }
 

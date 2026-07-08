@@ -19,7 +19,7 @@ export default function PoolError({
       <div className="alert" role="alert">
         <span className="alert-icon" aria-hidden="true">▲</span>
         <p className="alert-text">
-          Something went wrong loading this pool: {error.message}
+          Something went wrong loading this pool. Please try again.
         </p>
       </div>
       <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>

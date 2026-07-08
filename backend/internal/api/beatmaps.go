@@ -89,7 +89,12 @@ func (s *Server) ImportBeatmap(w http.ResponseWriter, r *http.Request) {
 
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		writeBadRequest(w, "missing multipart field \"file\" or upload exceeds size limit: "+err.Error())
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeProblem(w, http.StatusRequestEntityTooLarge, "Payload Too Large", "uploaded file exceeds the size limit")
+			return
+		}
+		writeBadRequest(w, "missing or invalid multipart field \"file\": "+err.Error())
 		return
 	}
 	defer file.Close()
