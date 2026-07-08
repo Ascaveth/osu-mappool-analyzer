@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,10 @@ func (s *Server) runEngine(r *http.Request, tournamentID string) (*domain.Tourna
 	if err != nil {
 		return nil, nil, err
 	}
-	analyses, _ := s.Engine.Run(r.Context(), tournament)
+	analyses, runErr := s.Engine.Run(r.Context(), tournament)
+	if runErr != nil {
+		log.Printf("engine run for tournament %q had errors: %v", tournamentID, runErr)
+	}
 	return tournament, analyses, nil
 }
 
