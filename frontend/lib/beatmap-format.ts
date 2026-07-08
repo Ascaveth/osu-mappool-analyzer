@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Beatmap } from "@/lib/types";
+import { modAccent } from "@/lib/mods";
 
 export function formatBeatmapLabel(
   bm: Pick<Beatmap, "artist" | "title" | "version">,
@@ -29,15 +30,6 @@ export function formatStarRating(starRating: number | null | undefined): string 
   return starRating == null ? "SR --" : `SR ${starRating.toFixed(2)}`;
 }
 
-const MOD_ACCENTS: Record<string, string> = {
-  NM: "var(--mod-nm)",
-  HD: "var(--mod-hd)",
-  HR: "var(--mod-hr)",
-  DT: "var(--mod-dt)",
-  FM: "var(--mod-fm)",
-  TB: "var(--mod-tb)",
-};
-
 // Slot codes are "{modPrefix}{index}", e.g. "HD2" — strip the trailing
 // digits to recover the mod prefix a category/slot belongs to.
 function modPrefix(code: string): string {
@@ -47,7 +39,7 @@ function modPrefix(code: string): string {
 // Returns the accent color for a slot/category's mod, or undefined for
 // mods outside the known set (kept unstyled rather than guessing a color).
 export function modAccentColor(code: string): string | undefined {
-  return MOD_ACCENTS[modPrefix(code)];
+  return modAccent(modPrefix(code));
 }
 
 // Renders a beatmap slot's row background: a left accent border in the
