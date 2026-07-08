@@ -240,8 +240,7 @@ func cloneCategory(c *domain.Category) *domain.Category {
 func cloneSlot(s *domain.Slot) *domain.Slot {
 	clone := *s
 	if s.Beatmap != nil {
-		bm := *s.Beatmap
-		clone.Beatmap = &bm
+		clone.Beatmap = cloneBeatmap(s.Beatmap)
 	}
 	return &clone
 }
