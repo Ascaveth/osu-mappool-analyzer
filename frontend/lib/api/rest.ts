@@ -14,6 +14,7 @@ import type {
   Citation,
   Finding,
 } from "@/lib/types";
+import { extractBeatmapId } from "@/lib/beatmap-id";
 import type { ApiClient } from "./client";
 import { ApiError } from "./client";
 import type { CreateTournamentInput } from "./types";
@@ -252,15 +253,7 @@ function extractCoverUrl(osuFileText: string): string | undefined {
   return `https://assets.ppy.sh/beatmaps/${setId}/covers/cover.jpg`;
 }
 
-function extractBeatmapId(url: string): string {
-  const setHash = url.match(/beatmapsets\/\d+#[a-z]+\/(\d+)/);
-  if (setHash) return setHash[1];
-  const beatmapPath = url.match(/beatmaps\/(\d+)/);
-  if (beatmapPath) return beatmapPath[1];
-  const bare = url.trim().match(/^(\d+)$/);
-  if (bare) return bare[1];
-  throw new Error(`Cannot parse beatmap ID from URL: ${url}`);
-}
+import { extractBeatmapId } from "@/lib/beatmap-id";
 
 export function createRestClient(baseUrl: string): ApiClient {
   const beatmapCovers = new Map<string, string>();
