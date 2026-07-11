@@ -253,8 +253,6 @@ function extractCoverUrl(osuFileText: string): string | undefined {
   return `https://assets.ppy.sh/beatmaps/${setId}/covers/cover.jpg`;
 }
 
-import { extractBeatmapId } from "@/lib/beatmap-id";
-
 export function createRestClient(baseUrl: string): ApiClient {
   const beatmapCovers = new Map<string, string>();
 

@@ -44,7 +44,7 @@ export function orderedSlotsForStage(
 }
 
 export function stageTotalSlots(stage: Stage): number {
-  return stage.categories.reduce((n, c) => n + c.slots.length, 0);
+  return orderedSlotsForStage(stage).length;
 }
 
 /**
