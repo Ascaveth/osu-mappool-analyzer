@@ -7,31 +7,31 @@
 <h3 align="center">osu! Mappool Analyzer</h3>
 
   <p align="center">
-    This osu! mappool analyzer is a work in progress. Always review each suggestion and decide whether it fits your mappools.
+    This project is a work in progress. Review each analysis suggestion and decide whether it fits your mappool.
     <br />
-    <a href="docs/01-vision.md"><strong>Explore the docs »</strong></a>
+    <a href="docs/01-vision.md"><strong>Read the docs</strong></a>
     <br />
     <br />
-    <a href="https://osu-mappool-analyzer-frontend-production.up.railway.app/">View Demo</a>
+    <a href="https://osu-mappool-analyzer-frontend-production.up.railway.app/">View demo</a>
     &middot;
-    <a href="https://github.com/Ascaveth/osu-mappool-analyzer/issues/new?labels=bug">Report Bug</a>
+    <a href="https://github.com/Ascaveth/osu-mappool-analyzer/issues/new?labels=bug">Report a bug</a>
     &middot;
-    <a href="https://github.com/Ascaveth/osu-mappool-analyzer/issues/new?labels=enhancement">Request Feature</a>
+    <a href="https://github.com/Ascaveth/osu-mappool-analyzer/issues/new?labels=enhancement">Request a feature</a>
   </p>
 </div>
 
 <details>
-  <summary>Table of Contents</summary>
+  <summary>Table of contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
+      <a href="#about-the-project">About the project</a>
       <ul>
-        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#built-with">Built with</a></li>
         <li><a href="#what-the-analyzers-actually-do">What the analyzers actually do</a></li>
       </ul>
     </li>
     <li>
-      <a href="#getting-started">Getting Started</a>
+      <a href="#getting-started">Getting started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
@@ -47,18 +47,18 @@
   </ol>
 </details>
 
-## About The Project
+## About the project
 
-Started as a idea, trying to make balancing and mappooling great again with the help of automations and reducing burdens to the playtester or mappooler so both playtester or mappooler arranging mappools takes less time.
+osu! Mappool Analyzer helps mappoolers and playtesters review tournament pools. It automates checks for balance, composition, diversity, and difficulty progression so they can spend less time checking pools by hand.
 
-- **Backend** (`backend/`): a Go API with a working analysis engine behind it. Tournaments, stages, categories, slots, beatmaps all modeled and exposed over REST.
-- **Frontend** (`frontend/`): a Next.js app. The tournament creation flow, pool editor, and report view (`app/tournaments/new`, `app/tournaments/[id]/pool`, `app/tournaments/[id]/report`) call the backend through a real REST client in `lib/api/`. The root page (`app/page.tsx`) is a standalone demo that still renders off `lib/sample-data.ts`.
+- The Go backend in `backend/` runs the analysis engine and exposes tournaments, stages, categories, slots, and beatmaps through a REST API.
+- The Next.js frontend in `frontend/` calls the backend through the REST client in `lib/api/`. The tournament creation flow, pool editor, and report view use `app/tournaments/new`, `app/tournaments/[id]/pool`, and `app/tournaments/[id]/report`. The root page at `app/page.tsx` is a standalone demo that uses `lib/sample-data.ts`.
 
-Storage is in-memory only. Restart the backend and every tournament you created is gone; there's no Postgres or any other persistence layer plugged in yet, despite that being the long-term plan.
+Storage is in memory only. Restarting the backend deletes all tournaments you created. Postgres persistence is planned but has not been implemented.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### Built With
+### Built with
 
 * [![Go][Go.dev]][Go-url]
 * [![Next][Next.js]][Next-url]
@@ -70,41 +70,41 @@ Storage is in-memory only. Restart the backend and every tournament you created 
 
 ### What the analyzers actually do
 
-Under `backend/internal/analysis/`:
+The analyzers in `backend/internal/analysis/` check pools at three levels:
 
-**Tournament-level** (`tournament/`): balance, composition, diversity, progression. These look at a pool across its whole stage list: is Round of 16 meaningfully harder than Qualifiers, does one mod category dominate, that sort of question.
+- Tournament analyzers in `tournament/` check balance, composition, diversity, and progression across stages. For example, they check whether the Round of 16 is harder than Qualifiers and whether one mod category dominates the pool.
 
-**Metadata-level** (`metadata/`): BPM range, difficulty settings, mapper repetition, object density. Per-beatmap and per-slot checks that feed into the tournament-level analyzers above.
+- Metadata analyzers in `metadata/` check BPM range, difficulty settings, mapper repetition, and object density for each beatmap and slot. Their results feed into the tournament analyzers.
 
-**Pattern-level** (`pattern/`): jump distance, jump angle, slider complexity, spinner usage, stream bursts. Lower-level readouts of what's actually in the beatmap file, parsed by `internal/osufile`.
+- Pattern analyzers in `pattern/` check jump distance, jump angle, slider complexity, spinner usage, and stream bursts. They use beatmap files parsed by `internal/osufile`.
 
-None of this is hardcoded to a fixed bracket shape. Tournament structure stages, slot counts, mod categories is user-defined, because no two tournaments run the same format.
+You define the tournament stages, slot counts, and mod categories to match your tournament format.
 
-Go backend, stdlib HTTP plus `google/uuid` (that's the only external dependency, no framework). It exposes a REST API over the analysis engine and normalizes raw beatmap data before anything touches an analyzer. The Next.js frontend is a presentation layer on top; it doesn't do analysis itself.
+The Go backend uses the standard library HTTP server without a framework. Its only external dependency is `google/uuid`. It normalizes raw beatmap data before passing it to the analyzers and exposes the results through REST. The Next.js frontend displays those results. All analysis runs on the backend.
 
-Full design docs live in `docs/` (`01-vision.md` through `16-test-plan.md`). Treat those as specification, not a changelog of what's built — plenty of it is still ahead of the code.
+The design documents in `docs/`, numbered `01-vision.md` through `16-test-plan.md`, describe the specification. Some of that specification is still awaiting implementation.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-* Docker and Docker Compose, if you want the one-command path
-* Go 1.21+ and Node.js 18+, if you'd rather run each side manually
+* Docker and Docker Compose to run both services with one command
+* Go 1.21+ and Node.js 18+ to run the backend and frontend manually
 
 ### Installation
 
-**With Docker:**
+With Docker:
 
 ```sh
 docker-compose up
 ```
 
-Backend on `localhost:8080`, frontend on `localhost:3000`. The frontend build bakes in `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/v1` at build time since the API calls happen client-side, not from Next's server.
+The backend runs on `localhost:8080` and the frontend on `localhost:3000`. The frontend build sets `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/v1`. API calls run in the browser, so this address must be reachable from your browser.
 
-**Without Docker:**
+Without Docker, run each service in a separate terminal:
 
 ```sh
 # backend
@@ -119,9 +119,9 @@ cd frontend && npm install && npm run dev
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Create a tournament through the frontend's new-tournament flow, define its stages and mod categories, then drop beatmaps into the pool editor. The report view runs the analysis engine over the pool and renders composition, progression, balance, and diversity findings.
+Create a tournament in the frontend and define its stages and mod categories. Add beatmaps in the pool editor, then open the report view to analyze the pool and review findings on composition, progression, balance, and diversity.
 
-Everything the frontend shows is also available directly over the REST API in `backend/internal/api` if you want to script against it.
+You can also script these operations through the REST API. Its handlers live in `backend/internal/api`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -162,16 +162,16 @@ frontend/
 cd backend && go test ./...
 ```
 
-That's what CI runs (`.github/workflows/backend-tests.yml`). The frontend has no test suite yet — `npm run lint` is the only check configured there.
+CI runs this command in `.github/workflows/backend-tests.yml`. The frontend has no test suite yet. Its only configured check is `npm run lint`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Postgres persistence layer (storage is in-memory only right now)
-- [ ] Sharpens the analyzer backend so it can give a better analysis report for the inputted mappools
-- [ ] Imports from the Mappool Google Sheets (usually a tournament uploads their mappools list on the Google Sheets)
+- [ ] Add Postgres persistence. Storage is currently in memory only.
+- [ ] Improve the backend analyzers and the reports they produce for submitted mappools.
+- [ ] Import mappools from Google Sheets, where tournaments often publish their pool lists.
 
 See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) for the full list of proposed features and known gaps.
 
@@ -182,15 +182,15 @@ See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) f
 
 ### Suggesting something
 
-Open a GitHub issue on [Ascaveth/osu-mappool-analyzer](https://github.com/Ascaveth/osu-mappool-analyzer). If the idea touches architecture or adds a new analyzer, point at the relevant file under `docs/` if one already covers it.
+Open a GitHub issue on [Ascaveth/osu-mappool-analyzer](https://github.com/Ascaveth/osu-mappool-analyzer). For architecture changes or new analyzers, reference the relevant document under `docs/` if one covers the idea.
 
-If it doesn't produce or improve an insight for tournament organizers, it's probably out of scope.
+Proposed changes should help tournament organizers understand or improve their mappools.
 
 ### Submitting a change
 
 1. Fork the project
 2. Branch off `main`: `feature/<name>`, `bugfix/<name>`, `refactor/<module>`, `docs/<topic>`, etc.
-3. Commit using [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, e.g. `feat(analyzer): add mapper diversity check`. One logical change per commit — don't mix a refactor into a feature commit.
+3. Commit using [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, e.g. `feat(analyzer): add mapper diversity check`. Keep one logical change per commit. Submit refactors separately from features.
 4. Before opening a PR:
    ```sh
    cd backend && go test ./...
@@ -216,7 +216,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Project Link: [https://github.com/Ascaveth/osu-mappool-analyzer](https://github.com/Ascaveth/osu-mappool-analyzer)
+Project repository: [https://github.com/Ascaveth/osu-mappool-analyzer](https://github.com/Ascaveth/osu-mappool-analyzer)
 
 Questions or ideas: [open an issue](https://github.com/Ascaveth/osu-mappool-analyzer/issues).
 
