@@ -1033,27 +1033,59 @@ body {
 
 /* === Landing page: running order (how-to-use tutorial) === */
 
+.landing {
+  padding-bottom: 2rem;
+}
+
+.landing .masthead {
+  padding-bottom: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.landing .masthead-title {
+  font-weight: 500;
+  font-size: clamp(2.25rem, 1.5rem + 2.5vw, 3.5rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.landing .masthead-eyebrow {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-block: 0.75rem 0;
+}
+
+.landing-intro {
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+  line-height: 1.5;
+  max-inline-size: 42rem;
+  margin-bottom: 2rem;
+  color: var(--ink-soft);
+}
+
 .howto {
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--paper-line);
   padding-top: 1.5rem;
-  margin-bottom: 3rem;
-  max-width: 40rem;
+  margin-bottom: 2rem;
 }
 
 .howto-eyebrow {
   font-family: var(--font-data), monospace;
-  font-size: 0.6875rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  line-height: 1rem;
   color: var(--ink-soft);
 }
 
 .howto-title {
   font-family: var(--font-display), serif;
-  font-weight: 600;
-  font-size: clamp(1.375rem, 2.6vw, 1.75rem);
-  letter-spacing: -0.005em;
-  margin-top: 0.4rem;
+  font-weight: 500;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  margin-top: 0.5rem;
   margin-bottom: 1.5rem;
 }
 
@@ -1061,49 +1093,118 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-left: 1px solid var(--paper-line);
+  border-block: 1px solid var(--paper-line);
 }
 
 .howto-step {
   display: grid;
-  grid-template-columns: 3rem 1fr;
+  grid-template-columns: 2rem minmax(0, 1fr);
   gap: 1rem;
-  padding: 0.9rem 0 0.9rem 1.25rem;
-  margin-left: -1px;
-  border-left: 1px solid transparent;
+  padding-block: 1.25rem;
+  min-block-size: 4.5rem;
+  align-items: baseline;
 }
 
 .howto-step + .howto-step {
-  border-top: 1px dashed var(--paper-line);
+  border-top: 1px solid var(--paper-line);
 }
 
 .howto-step-num {
   font-family: var(--font-data), monospace;
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
   color: var(--brass);
-  line-height: 1.4;
+  line-height: 1.5rem;
+}
+
+.howto-step-body {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: baseline;
 }
 
 .howto-step-title {
-  font-family: var(--font-display), serif;
-  font-weight: 600;
-  font-size: 1.0625rem;
-  margin-bottom: 0.3rem;
+  font-family: var(--font-body), sans-serif;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 
 .howto-step-desc {
   font-family: var(--font-body), sans-serif;
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.5rem;
   color: var(--ink-soft);
   margin: 0;
 }
 
 @media (max-width: 720px) {
-  .howto-step {
-    grid-template-columns: 2rem 1fr;
+  .howto-step-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
   }
+}
+
+.landing-action.btn {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  gap: 0.75rem;
+  padding-inline: 1.25rem;
+  border-radius: 0.5rem;
+  transition-property: color, background-color, border-color;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing .disclaimer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top-style: solid;
+  font-style: normal;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  max-width: 38rem;
+}
+
+.landing .disclaimer-eyebrow,
+.landing .footer-note,
+.landing + .site-footer .footer-heading {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.landing .disclaimer-eyebrow {
+  margin-bottom: 0.5rem;
+}
+
+.landing .footer-note {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  text-align: start;
+}
+
+.landing .footer-note-detail {
+  font-style: normal;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  letter-spacing: 0;
+}
+
+.landing + .site-footer {
+  padding-top: 2rem;
+}
+
+.landing + .site-footer .footer-meta-line,
+.landing + .site-footer .footer-fineprint {
+  font-size: 0.75rem;
+  line-height: 1.333333;
+  letter-spacing: 0;
 }
 
 /* === Site footer === */
@@ -1221,7 +1322,7 @@ body {
 .note-body, .note-why, .alert-text { overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) {
-  .toggle, .toggle::before, .toggle::after, .btn {
+  .toggle, .toggle::before, .toggle::after, .btn, .landing-action.btn {
     animation: none;
     transition: none;
   }

@@ -2,22 +2,22 @@ const STEPS = [
   {
     numeral: "1",
     title: "Set up your tournament",
-    body: "Add your stages (like Qualifiers or Grand Finals), pick your mod categories, and say how many maps go in each. You can match any bracket format.",
+    body: "Choose stages like Qualifiers or Grand Finals. Set mod categories and slot counts.",
   },
   {
     numeral: "2",
     title: "Add your maps",
-    body: "Fill in each slot with the beatmap you've picked for it.",
+    body: "Assign a beatmap to each slot in your pool.",
   },
   {
     numeral: "3",
     title: "Get your report",
-    body: "The analyzer checks your pool's difficulty, mod mix, and balance across every stage.",
+    body: "Check difficulty, mod mix, and balance across every stage.",
   },
   {
     numeral: "4",
     title: "Read what it found",
-    body: "Each note explains why something might be an issue, not just that it is one — so you can decide if it's worth fixing.",
+    body: "Read the reason behind each finding. Decide whether it needs a change for your tournament.",
   },
 ];
 
@@ -27,9 +27,9 @@ const STEPS = [
  */
 export function HowToUse() {
   return (
-    <section className="howto reveal" style={{ animationDelay: "160ms" }}>
+    <section className="howto" aria-labelledby="howto-title">
       <p className="howto-eyebrow">Getting started</p>
-      <h2 className="howto-title">How to use this analyzer</h2>
+      <h2 className="howto-title" id="howto-title">How to use this analyzer</h2>
       <ol className="howto-steps">
         {STEPS.map((step) => (
           <li className="howto-step" key={step.numeral}>
