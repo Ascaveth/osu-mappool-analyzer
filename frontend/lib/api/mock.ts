@@ -1,4 +1,5 @@
 import type { Tournament, Beatmap, Slot, Report, Stage, Category, Citation } from "@/lib/types";
+import { extractBeatmapId } from "@/lib/beatmap-id";
 import { modLabel } from "@/lib/mods";
 import type { ApiClient } from "./client";
 import type { CreateTournamentInput } from "./types";
@@ -75,19 +76,6 @@ function parseOsu(text: string): Omit<Beatmap, "id"> {
     bpm,
     coverUrl,
   };
-}
-
-function extractBeatmapId(url: string): string {
-  // https://osu.ppy.sh/beatmapsets/1555041#osu/3176982
-  const setHash = url.match(/beatmapsets\/\d+#[a-z]+\/(\d+)/);
-  if (setHash) return setHash[1];
-  // https://osu.ppy.sh/beatmaps/3176982
-  const beatmapPath = url.match(/beatmaps\/(\d+)/);
-  if (beatmapPath) return beatmapPath[1];
-  // bare ID
-  const bare = url.trim().match(/^(\d+)$/);
-  if (bare) return bare[1];
-  throw new Error(`Cannot parse beatmap ID from URL: ${url}`);
 }
 
 function applyAssignments(t: Tournament, s: Store): Tournament {

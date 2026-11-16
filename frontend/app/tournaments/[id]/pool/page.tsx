@@ -13,7 +13,18 @@ import {
   modAccentColor,
   slotAccentStyle,
 } from "@/lib/beatmap-format";
+import {
+  previewBulkPaste,
+  stageTotalSlots,
+  type BulkPasteAssignment,
+  type BulkPastePreview,
+} from "@/lib/bulk-paste";
 import { ClipboardCheck, Trash2 } from "lucide-react";
+
+type StageBulkState = {
+  text: string;
+  preview: BulkPastePreview | null;
+};
 
 export default function PoolPage({
   params,
@@ -32,6 +43,9 @@ export default function PoolPage({
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
   const [applyingAll, setApplyingAll] = useState(false);
   const [applyingTotal, setApplyingTotal] = useState(0);
+  const [bulkByStage, setBulkByStage] = useState<Record<string, StageBulkState>>(
+    {},
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -73,8 +87,11 @@ export default function PoolPage({
     )
     .map((sl) => sl.id);
 
-  const importAndAssign = async (slotId: string, opts?: { skipRefresh?: boolean }) => {
-    const url = (slotInputs[slotId] ?? "").trim();
+  const importAndAssign = async (
+    slotId: string,
+    opts?: { skipRefresh?: boolean; rawInput?: string },
+  ) => {
+    const url = (opts?.rawInput ?? slotInputs[slotId] ?? "").trim();
     if (!url) return;
     setSlotImporting((prev) => ({ ...prev, [slotId]: true }));
     setSlotErrors((prev) => {
@@ -101,6 +118,64 @@ export default function PoolPage({
     }
   };
 
+  const getBulkState = (stageId: string): StageBulkState =>
+    bulkByStage[stageId] ?? { text: "", preview: null };
+
+  const setBulkText = (stageId: string, text: string) => {
+    setBulkByStage((prev) => ({
+      ...prev,
+      [stageId]: { text, preview: null },
+    }));
+  };
+
+  const runBulkPreview = (stageId: string) => {
+    const stage = tournament?.stages.find((s) => s.id === stageId);
+    if (!stage) return;
+    const text = getBulkState(stageId).text;
+    setBulkByStage((prev) => ({
+      ...prev,
+      [stageId]: { text, preview: previewBulkPaste(text, stage) },
+    }));
+  };
+
+  const APPLY_ALL_CONCURRENCY = 3;
+
+  const applyBulkAssignments = async (
+    stageId: string,
+    assignments: BulkPasteAssignment[],
+  ) => {
+    if (assignments.length === 0) return;
+    setApplyingAll(true);
+    setApplyingTotal(assignments.length);
+    setSlotInputs((prev) => {
+      const next = { ...prev };
+      for (const a of assignments) next[a.slotId] = a.rawInput;
+      return next;
+    });
+    const queue = [...assignments];
+    const worker = async () => {
+      let next: BulkPasteAssignment | undefined;
+      while ((next = queue.shift()) !== undefined) {
+        await importAndAssign(next.slotId, {
+          skipRefresh: true,
+          rawInput: next.rawInput,
+        });
+      }
+    };
+    await Promise.allSettled(
+      Array.from(
+        { length: Math.min(APPLY_ALL_CONCURRENCY, queue.length) },
+        worker,
+      ),
+    );
+    await refresh();
+    setBulkByStage((prev) => ({
+      ...prev,
+      [stageId]: { text: "", preview: null },
+    }));
+    setApplyingAll(false);
+  };
+
   const clear = async (slotId: string) => {
     try {
       await api.clearBeatmap(slotId);
@@ -119,8 +194,6 @@ export default function PoolPage({
       setError(e instanceof Error ? e.message : "Failed to clear slot");
     }
   };
-
-  const APPLY_ALL_CONCURRENCY = 3;
 
   const applyAll = async () => {
     if (pendingSlotIds.length === 0) return;
@@ -204,7 +277,13 @@ export default function PoolPage({
         aria-hidden={pageFrozen || undefined}
         style={pageFrozen ? { pointerEvents: "none" } : undefined}
       >
-        {tournament.stages.map((stage) => (
+        {tournament.stages.map((stage) => {
+          const bulk = getBulkState(stage.id);
+          const totalSlots = stageTotalSlots(stage);
+          const categorySummary = stage.categories
+            .map((c) => `${c.name}(${c.slots.length})`)
+            .join(", ");
+          return (
           <section key={stage.id} className="pool-stage">
             <div className="pool-stage-head">
               <div className="stage-head-title">
@@ -215,6 +294,102 @@ export default function PoolPage({
                   </span>
                 )}
               </div>
+            </div>
+
+            <div className="pool-bulk-paste">
+              <label className="pool-bulk-label" htmlFor={`bulk-${stage.id}`}>
+                Bulk paste beatmap IDs
+                <span className="pool-bulk-hint">
+                  {totalSlots} slots · {categorySummary || "no categories"} · one
+                  ID per line, in category order
+                </span>
+              </label>
+              <textarea
+                id={`bulk-${stage.id}`}
+                className="field-input pool-bulk-textarea"
+                rows={Math.min(8, Math.max(4, totalSlots))}
+                placeholder={"880321\n975588\n2893305\n…"}
+                value={bulk.text}
+                onChange={(e) => setBulkText(stage.id, e.target.value)}
+                disabled={pageFrozen}
+                aria-describedby={`bulk-help-${stage.id}`}
+              />
+              <p id={`bulk-help-${stage.id}`} className="pool-bulk-help">
+                Paste fills slots in this stage&apos;s category order (e.g. NM1…NMn,
+                then HD1…, and so on). Count must match exactly.
+              </p>
+              <div className="pool-bulk-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => runBulkPreview(stage.id)}
+                  disabled={pageFrozen || !bulk.text.trim()}
+                >
+                  Preview mapping
+                </button>
+                {bulk.preview?.ok === true && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const preview = getBulkState(stage.id).preview;
+                      if (preview?.ok) {
+                        void applyBulkAssignments(stage.id, preview.assignments);
+                      }
+                    }}
+                    disabled={pageFrozen}
+                  >
+                    Apply {bulk.preview.assignments.length} to {stage.name}
+                  </button>
+                )}
+              </div>
+
+              {bulk.preview && !bulk.preview.ok && (
+                <div className="pool-bulk-feedback" role="alert">
+                  {bulk.preview.kind === "empty" && (
+                    <p className="slot-error">
+                      ▲ Paste at least one beatmap ID (one per line).
+                    </p>
+                  )}
+                  {bulk.preview.kind === "count_mismatch" && (
+                    <p className="slot-error">
+                      ▲ Expected {bulk.preview.expected} IDs for this stage, got{" "}
+                      {bulk.preview.got}. No slots were changed.
+                    </p>
+                  )}
+                  {bulk.preview.kind === "malformed" && (
+                    <ul className="pool-bulk-errors">
+                      {bulk.preview.errors.map((err) => (
+                        <li key={`${err.line}-${err.raw}`} className="slot-error">
+                          ▲ Line {err.line}: {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {bulk.preview?.ok && (
+                <div
+                  className="pool-bulk-preview"
+                  aria-label={`Preview assignment for ${stage.name}`}
+                >
+                  <p className="pool-bulk-preview-title">
+                    Confirm mapping ({bulk.preview.totalSlots} slots)
+                  </p>
+                  <ol className="pool-bulk-preview-list">
+                    {bulk.preview.assignments.map((a) => (
+                      <li key={a.slotId}>
+                        <span className="pool-bulk-slot">{a.slotCode}</span>
+                        <span className="pool-bulk-arrow" aria-hidden="true">
+                          →
+                        </span>
+                        <span className="pool-bulk-id">{a.beatmapId}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
 
             {stage.categories.map((cat) => (
@@ -311,7 +486,8 @@ export default function PoolPage({
               </div>
             ))}
           </section>
-        ))}
+          );
+        })}
       </div>
 
       {(pendingSlotIds.length > 0 || applyingAll) && (
