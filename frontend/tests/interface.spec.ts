@@ -224,3 +224,31 @@ test("setup creates the configured tournament through the migrated controls", as
   await expect(page.getByText("★ 6.75 projected")).toBeVisible();
   await expect(page.getByText("0 / 2 slots filled", { exact: false })).toBeVisible();
 });
+
+test("stage bulk paste retains preview, import locking, and focus restoration", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await openPool(page);
+  const input = page.getByLabel("Bulk paste beatmap IDs", { exact: false }).first();
+  await input.fill("3176982");
+  await page.getByRole("button", { name: "Preview mapping", exact: true }).first().click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("Expected 2 IDs");
+  await expect(page.getByText("0 / 4 slots filled", { exact: false })).toBeVisible();
+  await input.fill("3176982\nhttps://osu.ppy.sh/beatmaps/3176983");
+  await page.getByRole("button", { name: "Preview mapping", exact: true }).first().click();
+  await expect(page.getByText("Confirm mapping (2 slots)")).toBeVisible();
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/osu-proxy*", async (route) => {
+    await held;
+    await route.fulfill({ body: "osu file format v14\n[Metadata]\nTitle:Bulk fixture\nArtist:Artist\nCreator:Mapper\nVersion:Hard\n[Difficulty]\nApproachRate:9\nOverallDifficulty:8\nCircleSize:4\nHPDrainRate:5\n" });
+  });
+  await page.getByRole("button", { name: "Apply 2 to Qualifiers", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeFocused();
+  await expect(input).toBeDisabled();
+  release();
+  await expect(page.getByText("2 / 4 slots filled", { exact: false })).toBeVisible();
+  await expect(input).toHaveValue("");
+  await expect(input).toBeFocused();
+  await expect(page.getByRole("button", { name: "Run Analysis" })).toBeDisabled();
+  await expectRowsToFit(page);
+});
