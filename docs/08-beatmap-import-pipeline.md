@@ -41,32 +41,32 @@ backend/
 │           └── beatmap_repository_test.go
 ```
 
-A Postgres-backed `storage.BeatmapRepository` implementation is deferred to whichever phase first needs real persistence (Phase 5/10) — the interface is the contract; `memory` is sufficient until then, per [Architecture Principle 11](04-architecture-principles.md#11-testability-is-a-design-constraint-not-an-afterthought) (analyzers and pipeline stages must be testable without standing up infrastructure).
+A Postgres-backed `storage.BeatmapRepository` implementation is deferred to whichever phase first needs real persistence (Phase 5/10): the interface is the contract; `memory` is sufficient until then, per [Architecture Principle 11](04-architecture-principles.md#11-testability-is-a-design-constraint-not-an-afterthought) (analyzers and pipeline stages must be testable without standing up infrastructure).
 
 ## What gets parsed
 
 `osufile.Parse` reads:
 
-- **Header** — `osu file format vNN`; anything else returns `ErrNotAnOsuFile`. A UTF-8 BOM before the header is tolerated.
-- **`[General]`, `[Metadata]`, `[Difficulty]`** — `Key: Value` lines, captured as string maps. Normalization picks the specific fields it needs (`Title`, `Artist`, `Creator`, `Version`, `Tags`, `HPDrainRate`, `CircleSize`, `OverallDifficulty`, `ApproachRate`, `SliderMultiplier`); unrecognized keys are preserved in the raw map but currently unused.
-- **`[TimingPoints]`** — each line's offset, beat length, meter, and inherited/uninherited flag.
-- **`[HitObjects]`** — each line's position, time, and type-specific fields (slider curve length + repeat count; spinner end time).
+- Header: `osu file format vNN`; anything else returns `ErrNotAnOsuFile`. A UTF-8 BOM before the header is tolerated.
+- **`[General]`, `[Metadata]`, `[Difficulty]`**: `Key: Value` lines, captured as string maps. Normalization picks the specific fields it needs (`Title`, `Artist`, `Creator`, `Version`, `Tags`, `HPDrainRate`, `CircleSize`, `OverallDifficulty`, `ApproachRate`, `SliderMultiplier`); unrecognized keys are preserved in the raw map but currently unused.
+- **`[TimingPoints]`**: each line's offset, beat length, meter, and inherited/uninherited flag.
+- **`[HitObjects]`**: each line's position, time, and type-specific fields (slider curve length + repeat count; spinner end time).
 
-Malformed individual lines are skipped, not fatal — a single corrupt timing point or hit object line must not fail the entire import, per the parser's documented behavior (verified by `TestParse_SkipsMalformedLinesWithoutFailing`).
+Malformed individual lines are skipped, not fatal: a single corrupt timing point or hit object line must not fail the entire import, per the parser's documented behavior (verified by `TestParse_SkipsMalformedLinesWithoutFailing`).
 
 ## What normalization computes
 
-- **AR fallback** — format versions before AR existed (pre-v8) have no `ApproachRate` field; normalization falls back to `OverallDifficulty`, matching osu!'s own documented behavior.
-- **Slider end time** — implements osu!'s actual slider duration formula: `duration = pixelLength × slides / (100 × sliderMultiplier × velocity) × beatLength`, where `velocity` comes from the nearest preceding inherited (green) timing point and resets to `1.0` at every uninherited (red) line. This is the single most error-prone part of `.osu` parsing and is covered by `TestBeatmap_HappyPath`'s slider duration assertion.
-- **Dominant BPM** — a beatmap can have many timing changes; `domain.Beatmap.BPM` is the BPM that covers the most playtime (duration-weighted mode across uninherited points), not just the first or most frequent value. This single number is what BPM-distribution analyzers (Phase 6) will consume directly; the full `TimingPoints` list remains available for analyzers that need finer detail (e.g. rhythm/timing-variation analyzers in Phase 7).
-- **Length** — earliest hit-object start to latest hit-object end (correctly accounting for slider/spinner duration, not just the last object's start time).
-- **Content hash** — `sha256` of the exact source bytes (not a re-serialization), used by `BeatmapRepository` to detect re-imports of an identical file and resolve to the existing record rather than duplicating it, per the domain model's dedup rule.
+- AR fallback: format versions before AR existed (pre-v8) have no `ApproachRate` field; normalization falls back to `OverallDifficulty`, matching osu!'s own documented behavior.
+- Slider end time: implements osu!'s actual slider duration formula: `duration = pixelLength × slides / (100 × sliderMultiplier × velocity) × beatLength`, where `velocity` comes from the nearest preceding inherited (green) timing point and resets to `1.0` at every uninherited (red) line. This is the single most error-prone part of `.osu` parsing and is covered by `TestBeatmap_HappyPath`'s slider duration assertion.
+- Dominant BPM: a beatmap can have many timing changes; `domain.Beatmap.BPM` is the BPM that covers the most playtime (duration-weighted mode across uninherited points), not just the first or most frequent value. This single number is what BPM-distribution analyzers (Phase 6) will consume directly; the full `TimingPoints` list remains available for analyzers that need finer detail (e.g. rhythm/timing-variation analyzers in Phase 7).
+- Length: earliest hit-object start to latest hit-object end (correctly accounting for slider/spinner duration, not just the last object's start time).
+- Content hash: `sha256` of the exact source bytes (not a re-serialization), used by `BeatmapRepository` to detect re-imports of an identical file and resolve to the existing record rather than duplicating it, per the domain model's dedup rule.
 
 ## What is explicitly deferred
 
-- **Star Rating is not computed locally.** This pipeline (`osufile` → `normalize`) does not implement osu!'s strain-based difficulty algorithm itself and leaves `domain.Beatmap.StarRating` untouched. However, Star Rating is no longer wholly deferred: `backend/internal/enrich` performs best-effort, import-time enrichment by resolving each beatmap's osu! numeric ID and fetching official Star Rating values from the live osu! API for a fixed set of mod combinations, persisting them via `storage.StarRatingRepository`. This is a separate concern from `normalize` — it's I/O-bound, best-effort, and network-dependent, so it stays out of the pure/offline import path proper. See [17-osu-api-integration.md](17-osu-api-integration.md) for the enrichment design and [18-configuration-and-modmap.md](18-configuration-and-modmap.md) for how category names (e.g. "HR", "DT") map to the mod combinations fetched.
-- **Mania hold notes** (and any other non-circle/slider/spinner object type) are parsed as `RawHitObjectUnknown` and dropped during normalization, not counted, not erroring. The project is std-pool-focused per [02-scope.md](02-scope.md); mode-specific parsing is a future addition if mania/taiko/catch pools ever enter scope.
-- **No persistence implementation beyond in-memory.** The `BeatmapRepository` interface is final for this phase; a Postgres implementation is straightforward to add later without touching `osufile` or `normalize`, since both are storage-agnostic.
+- Star Rating is not computed locally. This pipeline (`osufile` → `normalize`) does not implement osu!'s strain-based difficulty algorithm itself and leaves `domain.Beatmap.StarRating` untouched. However, Star Rating is no longer wholly deferred: `backend/internal/enrich` performs best-effort, import-time enrichment by resolving each beatmap's osu! numeric ID and fetching official Star Rating values from the live osu! API for a fixed set of mod combinations, persisting them via `storage.StarRatingRepository`. This is a separate concern from `normalize`: it's I/O-bound, best-effort, and network-dependent, so it stays out of the pure/offline import path proper. See [17-osu-api-integration.md](17-osu-api-integration.md) for the enrichment design and [18-configuration-and-modmap.md](18-configuration-and-modmap.md) for how category names (e.g. "HR", "DT") map to the mod combinations fetched.
+- Mania hold notes (and any other non-circle/slider/spinner object type) are parsed as `RawHitObjectUnknown` and dropped during normalization, not counted, not erroring. The project is std-pool-focused per [02-scope.md](02-scope.md); mode-specific parsing is a future addition if mania/taiko/catch pools ever enter scope.
+- No persistence implementation beyond in-memory. The `BeatmapRepository` interface is final for this phase; a Postgres implementation is straightforward to add later without touching `osufile` or `normalize`, since both are storage-agnostic.
 
 ## Testing
 
