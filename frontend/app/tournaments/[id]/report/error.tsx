@@ -16,7 +16,7 @@ export default function ReportError({
 
   return (
     <main className="programme">
-      <div className="alert" role="alert">
+      <div className="alert alert-error alert-soft" role="alert">
         <span className="alert-icon" aria-hidden="true">▲</span>
         <p className="alert-text">
           Something went wrong loading this report. Please try again.

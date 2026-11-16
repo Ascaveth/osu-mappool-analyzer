@@ -237,7 +237,7 @@ export default function NewTournamentPage() {
             </label>
             <input
               id="t-name"
-              className="field-input"
+              className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ascaveth Invitational 2023"
@@ -253,7 +253,7 @@ export default function NewTournamentPage() {
               <div key={stage._id} className="stage-builder-item">
                 <div className="stage-builder-header">
                   <input
-                    className="field-input"
+                    className="input"
                     value={stage.name}
                     onChange={(e) => updateStage(stage._id, { name: e.target.value })}
                     placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
@@ -261,7 +261,7 @@ export default function NewTournamentPage() {
                   />
                   <div className="inline-field">
                     <input
-                      className="field-input"
+                      className="input"
                       type="text"
                       inputMode="decimal"
                       placeholder="e.g. 6.75"
@@ -314,7 +314,7 @@ export default function NewTournamentPage() {
                             />
                           )}
                           <input
-                            className="field-input"
+                            className="input"
                             list="mod-category-options"
                             aria-label="Mod category"
                             placeholder="NM"
@@ -329,7 +329,7 @@ export default function NewTournamentPage() {
                         </div>
                         <div className="inline-field">
                           <input
-                            className="field-input"
+                            className="input"
                             type="number"
                             aria-label="Number of slots"
                             min={1}
@@ -382,7 +382,7 @@ export default function NewTournamentPage() {
           </div>
 
           {error && (
-            <div className="alert" role="alert">
+            <div className="alert alert-error alert-soft" role="alert">
               <span className="alert-icon" aria-hidden="true">▲</span>
               <p className="alert-text">{error}</p>
             </div>

@@ -148,7 +148,7 @@ export default function PoolPage({
   if (error && !tournament) {
     return (
       <main className="programme">
-        <div className="alert" role="alert">
+        <div className="alert alert-error alert-soft" role="alert">
           <span className="alert-icon" aria-hidden="true">▲</span>
           <p className="alert-text">Error: {error}</p>
         </div>
@@ -194,7 +194,7 @@ export default function PoolPage({
       </div>
 
       {error && (
-        <div className="alert" role="alert">
+        <div className="alert alert-error alert-soft" role="alert">
           <span className="alert-icon" aria-hidden="true">▲</span>
           <p className="alert-text">{error}</p>
         </div>
@@ -267,7 +267,7 @@ export default function PoolPage({
                         ) : (
                           <>
                             <input
-                              className="field-input slot-input"
+                              className="input slot-input"
                               placeholder="paste beatmap URL or ID"
                               aria-label={`Beatmap URL or ID for slot ${slot.code}`}
                               value={slotInputs[slot.id] ?? ""}
@@ -293,7 +293,7 @@ export default function PoolPage({
                               aria-label={`Import and assign beatmap to slot ${slot.code}`}
                             >
                               {slotImporting[slot.id] ? (
-                                <span className="spinner" aria-hidden="true" />
+                                <span className="loading loading-spinner loading-xs" aria-hidden="true" />
                               ) : (
                                 <ClipboardCheck size={14} aria-hidden="true" />
                               )}
@@ -324,7 +324,7 @@ export default function PoolPage({
           >
             {applyingAll ? (
               <>
-                <span className="spinner" aria-hidden="true" /> Importing…
+                <span className="loading loading-spinner loading-xs" aria-hidden="true" /> Importing…
               </>
             ) : (
               `Import All (${pendingSlotIds.length})`
@@ -358,7 +358,7 @@ export default function PoolPage({
 
       {(applyingAll || singleImportInFlight) && (
         <div className="loading-overlay" role="status" aria-live="polite">
-          <span className="spinner spinner--lg" aria-hidden="true" />
+          <span className="loading loading-spinner loading-lg" aria-hidden="true" />
           <span className="loading-overlay-text">
             {applyingAll
               ? `Importing ${applyingTotal} beatmap${applyingTotal === 1 ? "" : "s"}…`
