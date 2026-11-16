@@ -4,27 +4,27 @@ This is a recommendation, not a commitment. Phase 1 is documentation-only; this 
 
 ## Requirements driving the choice
 
-1. **Heavy parsing + numeric/geometric computation** — `.osu` file parsing, pattern analysis (jump distances, angles, stream detection) is CPU-bound work over hit-object sequences.
-2. **Plugin-style analyzer architecture** — needs a language with strong interfaces/traits and easy composition, not deep inheritance.
-3. **Long-lived, evolving schema** — tournament configs, beatmaps, and analysis results need a relational model that can grow without painful migrations.
-4. **Deterministic, testable units** — analyzers should be trivially unit-testable in isolation.
-5. **Small team / solo-friendly** — avoid stacks that need a platform team to operate.
+1. Heavy parsing + numeric/geometric computation: `.osu` file parsing, pattern analysis (jump distances, angles, stream detection) is CPU-bound work over hit-object sequences.
+2. Plugin-style analyzer architecture: needs a language with strong interfaces/traits and easy composition, not deep inheritance.
+3. Long-lived, evolving schema: tournament configs, beatmaps, and analysis results need a relational model that can grow without painful migrations.
+4. Deterministic, testable units: analyzers should be trivially unit-testable in isolation.
+5. Small team / solo-friendly: avoid stacks that need a platform team to operate.
 
 ## Backend: Go
 
 | Option | Verdict |
 |---|---|
-| **Go** | **Recommended.** Fast enough for parsing/pattern math, simple concurrency for batch beatmap processing, interfaces are a natural fit for the analyzer-plugin contract, single static binary simplifies deployment, low operational overhead for a solo/small team. |
+| Go | Recommended. Fast enough for parsing/pattern math, simple concurrency for batch beatmap processing, interfaces are a natural fit for the analyzer-plugin contract, single static binary simplifies deployment, low operational overhead for a solo/small team. |
 | Rust | Best raw performance and correctness guarantees, but higher development friction for an evolving domain model that will be reshaped often in early phases. Worth revisiting if pattern analysis becomes a real bottleneck. |
 | NestJS (TypeScript) | Good DX and shares a language with the frontend, but weaker fit for CPU-heavy parsing/geometry work and its DI-heavy style encourages exactly the kind of implicit coupling the plugin architecture wants to avoid. |
 | Spring Boot | Explicitly de-prioritized per project default; no requirement here justifies its operational weight. |
 | ASP.NET | Comparable to Go technically, but no team familiarity advantage stated and smaller ecosystem fit for this domain (osu! tooling ecosystem skews Go/Rust/Node). |
 
-**Analyzer interface fit:** Go's small interfaces (`Analyze(ctx, NormalizedPool) (AnalysisResult, error)`) map directly onto the plugin requirement in principle 3 — each analyzer is a package implementing one interface, registered into the engine, with zero compile-time dependency on other analyzers.
+Analyzer interface fit: Go's small interfaces (`Analyze(ctx, NormalizedPool) (AnalysisResult, error)`) map directly onto the plugin requirement in principle 3: each analyzer is a package implementing one interface, registered into the engine, with zero compile-time dependency on other analyzers.
 
 ## Database: PostgreSQL
 
-No real alternative considered — relational integrity (tournaments → stages → categories → slots → beatmaps) is exactly what the domain needs, JSONB covers the parts of beatmap metadata that don't deserve full normalization (e.g. raw timing point arrays), and it's the project's own listed default.
+No real alternative considered: relational integrity (tournaments → stages → categories → slots → beatmaps) is exactly what the domain needs, JSONB covers the parts of beatmap metadata that don't deserve full normalization (e.g. raw timing point arrays), and it's the project's own listed default.
 
 ## Cache: Redis (deferred)
 
@@ -32,7 +32,7 @@ Not needed until there's a real read-heavy API workload (e.g. repeated report re
 
 ## Frontend: Next.js + TypeScript + TailwindCSS + shadcn/ui
 
-Deferred decision in practice (Phase 11), but no reason to deviate from the project's own default list — it's the conventional, well-supported choice for a data-presentation frontend and nothing about this domain pushes toward an alternative.
+Deferred decision in practice (Phase 11), but no reason to deviate from the project's own default list: it's the conventional, well-supported choice for a data-presentation frontend and nothing about this domain pushes toward an alternative.
 
 ## Deployment: Docker + Docker Compose
 
@@ -59,12 +59,12 @@ Confirm or override this before Phase 4 (Import Pipeline) begins, since that's t
 
 ## Current Implementation Status
 
-This section reflects what is actually running today, not the target. It will drift as phases land — check the codebase, not just this note, when precision matters.
+This section reflects what is actually running today, not the target. It will drift as phases land: check the codebase, not just this note, when precision matters.
 
-- **Backend: Go.** Implemented as proposed (`backend/`).
-- **Database: PostgreSQL.** Not yet implemented. Storage is in-memory only (`backend/internal/storage/memory/`); no SQL migrations or Postgres-backed repository exist anywhere in the repo. The `storage.BeatmapRepository`/`storage.TournamentRepository` interfaces are in place per [08-beatmap-import-pipeline.md](08-beatmap-import-pipeline.md), so a Postgres implementation remains a drop-in addition, not a redesign.
-- **Cache: Redis.** Not implemented, as planned (deferred).
-- **Frontend: Next.js / TS / Tailwind / shadcn.** Implemented.
-- **Deployment: Docker Compose.** Not yet verified as part of this pass.
+- Backend: Go. Implemented as proposed (`backend/`).
+- Database: PostgreSQL. Not yet implemented. Storage is in-memory only (`backend/internal/storage/memory/`); no SQL migrations or Postgres-backed repository exist anywhere in the repo. The `storage.BeatmapRepository`/`storage.TournamentRepository` interfaces are in place per [08-beatmap-import-pipeline.md](08-beatmap-import-pipeline.md), so a Postgres implementation remains a drop-in addition, not a redesign.
+- Cache: Redis. Not implemented, as planned (deferred).
+- Frontend: Next.js / TS / Tailwind / shadcn. Implemented.
+- Deployment: Docker Compose. Not yet verified as part of this pass.
 
-The PostgreSQL/Redis recommendation above remains the target — this note does not supersede it, only records that the target hasn't been built yet.
+The PostgreSQL/Redis recommendation above remains the target: this note does not supersede it, only records that the target hasn't been built yet.
