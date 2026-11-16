@@ -63,10 +63,6 @@ function normalizeStarRatingInput(raw: string): string | null {
   return /^\d*\.?\d*$/.test(normalized) ? normalized : null;
 }
 
-function slotCodes(cat: CatDraft): string[] {
-  return Array.from({ length: cat.slotCount }, (_, i) => `${cat.modPrefix}${i + 1}`);
-}
-
 export default function NewTournamentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -252,20 +248,24 @@ export default function NewTournamentPage() {
             {stages.map((stage, si) => (
               <div key={stage._id} className="stage-builder-item">
                 <div className="stage-builder-header">
-                  <input
-                    className="input"
-                    value={stage.name}
-                    onChange={(e) => updateStage(stage._id, { name: e.target.value })}
-                    placeholder="Stage name (e.g. Qualifiers, Round of 16, Grand Finals)"
-                    style={{ flex: 1 }}
-                  />
-                  <div className="inline-field">
+                  <div className="field stage-name-field">
+                    <label className="field-label" htmlFor={`stage-name-${si}`}>Stage name</label>
                     <input
+                      id={`stage-name-${si}`}
+                      className="input"
+                      value={stage.name}
+                      onChange={(e) => updateStage(stage._id, { name: e.target.value })}
+                      placeholder="Qualifiers"
+                    />
+                  </div>
+                  <div className="field stage-rating-field">
+                    <label className="field-label" htmlFor={`stage-sr-${si}`}>Projected SR (optional)</label>
+                    <input
+                      id={`stage-sr-${si}`}
                       className="input"
                       type="text"
                       inputMode="decimal"
                       placeholder="e.g. 6.75"
-                      aria-label="Projected star rating for this stage (optional)"
                       aria-invalid={!isValidStarRating(stage.projectedStarRating)}
                       title="Optional target Star Rating. Defaults to this stage's NM1 beatmap once one is assigned."
                       value={stage.projectedStarRating}
@@ -276,13 +276,11 @@ export default function NewTournamentPage() {
                         }
                       }}
                       style={{
-                        width: "4.5rem",
                         borderColor: isValidStarRating(stage.projectedStarRating)
                           ? undefined
                           : "var(--mark)",
                       }}
                     />
-                    <span className="slot-stats">★ SR</span>
                   </div>
                   {stages.length > 1 && (
                     <button

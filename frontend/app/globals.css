@@ -11,7 +11,7 @@
   --ink: #1b1f17;
   --ink-soft: #5c6450;
   --mark: #8c2f2f;
-  --brass: #b5742a;
+  --brass: #8a551d;
   --confirm: #3f7a52;
 
   /* Mod-category accents — desaturated to sit alongside --brass/--mark
@@ -349,7 +349,7 @@ body {
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: 3rem 1fr auto;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
   gap: 0.85rem;
   align-items: center;
   min-height: 2.5rem;
@@ -389,7 +389,7 @@ body {
 
 /* Pool builder's row additionally carries an inline confirm/clear action. */
 .slot-row--editable {
-  grid-template-columns: 3rem 1fr auto auto;
+  grid-template-columns: 3rem minmax(0, 1fr) auto auto;
 }
 
 /* Dims a slot card while its beatmap import is in flight. */
@@ -414,7 +414,16 @@ body {
   background: color-mix(in srgb, var(--paper) 70%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  margin: 0;
+  color: var(--ink-soft);
 }
+
+.loading-overlay:not([open]) { display: none; }
 
 .loading-overlay-text {
   font-family: var(--font-data), monospace;
@@ -434,7 +443,9 @@ body {
 .slot-title {
   font-family: var(--font-data), monospace;
   font-size: 0.875rem;
-  line-height: 1.3;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .slot-stats {
@@ -620,7 +631,7 @@ body {
   width: 100%;
   min-width: 0;
   font-family: var(--font-body), system-ui, sans-serif;
-  font-size: 0.9375rem;
+  font-size: 1rem;
 }
 
 /* === Stage / category builder === */
@@ -633,8 +644,9 @@ body {
 
 .stage-builder-header {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .cat-list {
@@ -713,7 +725,7 @@ body {
   min-width: 0;
   padding: 0.3rem 0.6rem;
   font-family: var(--font-data), monospace;
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
 .slot-input::placeholder {
@@ -817,7 +829,7 @@ body {
 
 .setup-layout {
   display: grid;
-  grid-template-columns: 1fr minmax(280px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
   gap: 2.5rem;
   align-items: start;
 }
@@ -1071,6 +1083,34 @@ body {
     gap: 1.5rem;
   }
 }
+
+/* Stack the ledger before its title, statistics, or actions stop fitting. */
+@media (max-width: 860px) {
+  .slot-row,
+  .slot-row--editable {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+  .slot-code { grid-column: 1; }
+  .slot-title, .slot-stats { grid-column: 1 / -1; }
+  .slot-stats {
+    white-space: normal;
+    text-align: start;
+    overflow-wrap: anywhere;
+  }
+  .slot-stats.slot-chip { margin-left: 0; }
+  .slot-input { grid-column: 1; }
+  .pool-slot-clear, .pool-slot-confirm {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .stage-builder-header > .field { flex-basis: 100%; }
+}
+
+.stage-name-field { flex: 1 1 10rem; min-width: 0; }
+.stage-builder-header .field { margin-bottom: 0; }
+.stage-rating-field { flex: 0 1 10rem; }
+.note-body, .note-why, .alert-text { overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) {
   .toggle, .toggle::before, .toggle::after, .btn {

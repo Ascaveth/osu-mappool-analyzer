@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -32,6 +32,8 @@ export default function PoolPage({
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
   const [applyingAll, setApplyingAll] = useState(false);
   const [applyingTotal, setApplyingTotal] = useState(0);
+  const returnFocusId = useRef<string | null>(null);
+  const loadingDialog = useRef<HTMLDialogElement>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -57,9 +59,17 @@ export default function PoolPage({
   const pageFrozen = applyingAll || singleImportInFlight;
 
   useEffect(() => {
-    if (!pageFrozen) return;
+    if (!pageFrozen) {
+      loadingDialog.current?.close();
+      if (returnFocusId.current) {
+        (document.getElementById(returnFocusId.current) ?? document.getElementById("pool-heading"))?.focus();
+        returnFocusId.current = null;
+      }
+      return;
+    }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    loadingDialog.current?.showModal();
     return () => {
       document.body.style.overflow = previousOverflow;
     };
@@ -74,8 +84,10 @@ export default function PoolPage({
     .map((sl) => sl.id);
 
   const importAndAssign = async (slotId: string, opts?: { skipRefresh?: boolean }) => {
+    if (pageFrozen && !opts?.skipRefresh) return;
     const url = (slotInputs[slotId] ?? "").trim();
     if (!url) return;
+    if (!opts?.skipRefresh) returnFocusId.current = `slot-action-${slotId}`;
     setSlotImporting((prev) => ({ ...prev, [slotId]: true }));
     setSlotErrors((prev) => {
       const next = { ...prev };
@@ -94,7 +106,7 @@ export default function PoolPage({
     } catch (e) {
       setSlotErrors((prev) => ({
         ...prev,
-        [slotId]: e instanceof Error ? e.message : "Import failed",
+        [slotId]: `${e instanceof Error ? e.message : "Import failed"}. Use a beatmap ID such as 3176982 or a full beatmap URL, check your connection, and import again.`,
       }));
     } finally {
       setSlotImporting((prev) => ({ ...prev, [slotId]: false }));
@@ -123,7 +135,8 @@ export default function PoolPage({
   const APPLY_ALL_CONCURRENCY = 3;
 
   const applyAll = async () => {
-    if (pendingSlotIds.length === 0) return;
+    if (pageFrozen || pendingSlotIds.length === 0) return;
+    returnFocusId.current = "import-all";
     setApplyingAll(true);
     setApplyingTotal(pendingSlotIds.length);
     const queue = [...pendingSlotIds];
@@ -190,7 +203,7 @@ export default function PoolPage({
           {tournament.name}
           {tournament.edition ? ` ${tournament.edition}` : ""}
         </p>
-        <h1 className="masthead-title">Import Beatmaps</h1>
+        <h1 id="pool-heading" className="masthead-title" tabIndex={-1}>Import Beatmaps</h1>
       </div>
 
       {error && (
@@ -200,10 +213,7 @@ export default function PoolPage({
         </div>
       )}
 
-      <div
-        aria-hidden={pageFrozen || undefined}
-        style={pageFrozen ? { pointerEvents: "none" } : undefined}
-      >
+      <div>
         {tournament.stages.map((stage) => (
           <section key={stage.id} className="pool-stage">
             <div className="pool-stage-head">
@@ -256,6 +266,7 @@ export default function PoolPage({
                               {formatStat("OD", slot.beatmap.od, slot.effectiveDifficulty?.od)}
                             </span>
                             <button
+                              id={`slot-action-${slot.id}`}
                               className="btn btn-ghost pool-slot-clear"
                               onClick={() => clear(slot.id)}
                               title="Clear slot"
@@ -270,6 +281,8 @@ export default function PoolPage({
                               className="input slot-input"
                               placeholder="paste beatmap URL or ID"
                               aria-label={`Beatmap URL or ID for slot ${slot.code}`}
+                              aria-invalid={!!slotErrors[slot.id]}
+                              aria-describedby={slotErrors[slot.id] ? `slot-error-${slot.id}` : undefined}
                               value={slotInputs[slot.id] ?? ""}
                               onChange={(e) =>
                                 setSlotInputs((prev) => ({
@@ -278,11 +291,12 @@ export default function PoolPage({
                                 }))
                               }
                               onKeyDown={(e) => {
-                                if (e.key === "Enter") importAndAssign(slot.id);
+                                if (e.key === "Enter" && !e.nativeEvent.isComposing) importAndAssign(slot.id);
                               }}
                               disabled={!!slotImporting[slot.id]}
                             />
                             <button
+                              id={`slot-action-${slot.id}`}
                               className="btn btn-ghost pool-slot-confirm"
                               onClick={() => importAndAssign(slot.id)}
                               disabled={
@@ -303,7 +317,7 @@ export default function PoolPage({
                       </div>
                     </div>
                     {slotErrors[slot.id] && (
-                      <p className="slot-error">▲ {slotErrors[slot.id]}</p>
+                      <p id={`slot-error-${slot.id}`} className="slot-error" role="alert">▲ {slotErrors[slot.id]}</p>
                     )}
                   </div>
                   );
@@ -317,6 +331,7 @@ export default function PoolPage({
       {(pendingSlotIds.length > 0 || applyingAll) && (
         <div className="pool-apply-all">
           <button
+            id="import-all"
             className="btn btn-ghost"
             onClick={applyAll}
             disabled={applyingAll}
@@ -333,11 +348,7 @@ export default function PoolPage({
         </div>
       )}
 
-      <div
-        className="wizard-nav"
-        aria-hidden={pageFrozen || undefined}
-        style={pageFrozen ? { pointerEvents: "none" } : undefined}
-      >
+      <div className="wizard-nav">
         <span className="wizard-step-indicator">
           {filledCount} / {totalCount} slots filled
           {filledCount < totalCount && (
@@ -356,16 +367,21 @@ export default function PoolPage({
         </button>
       </div>
 
-      {(applyingAll || singleImportInFlight) && (
-        <div className="loading-overlay" role="status" aria-live="polite">
+      <dialog
+        ref={loadingDialog}
+        className="loading-overlay"
+        aria-labelledby="pool-loading-label"
+        onCancel={(event) => event.preventDefault()}
+      >
+        {pageFrozen && <>
           <span className="loading loading-spinner loading-lg" aria-hidden="true" />
-          <span className="loading-overlay-text">
+          <span id="pool-loading-label" className="loading-overlay-text" role="status">
             {applyingAll
               ? `Importing ${applyingTotal} beatmap${applyingTotal === 1 ? "" : "s"}…`
               : "Importing beatmap…"}
           </span>
-        </div>
-      )}
+        </>}
+      </dialog>
     </main>
   );
 }

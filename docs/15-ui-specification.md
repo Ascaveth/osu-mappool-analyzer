@@ -33,18 +33,23 @@ Client selection (`frontend/lib/api/index.ts`) is an environment switch: if `NEX
 
 `frontend/lib/sample-data.ts` (the hand-built fixture `Tournament`/`Report` from the original Phase 11 build) still exists in the repo but is no longer imported anywhere in `app/` — it's dead code left over from before live wiring landed and is a candidate for deletion in a future cleanup pass rather than a real fallback path.
 
-## shadcn/ui integration
+## daisyUI integration
 
-Corrected from the original spec: shadcn-style components (Radix UI primitives + Tailwind, per `docs/05-stack-proposal.md`) are now in the codebase under `frontend/components/ui/`:
+The frontend uses daisyUI v5 on Tailwind CSS v4 for buttons, inputs, alerts,
+loading indicators, and the native checkbox-based theme toggle. Only these
+components are included by the plugin in `frontend/app/globals.css`.
 
-- `tabs.tsx` (`@radix-ui/react-tabs`)
-- `switch.tsx` (`@radix-ui/react-switch`)
-- `radio-group.tsx` (`@radix-ui/react-radio-group`)
-- `dropdown-menu.tsx` (`@radix-ui/react-dropdown-menu`)
-- `theme-switch.tsx` — light/dark mode toggle, wired into the shared layout
-- `demo.tsx` — a scratch/reference file exercising the above, not a shipped page
+The Programme tokens supply daisyUI's semantic colors, sizes, and radii.
+Built-in themes are disabled. `next-themes` persists the preference and writes
+`data-theme="light"` or `data-theme="dark"` on the root, with transitions
+suppressed during a theme change. The Radix switch has been removed.
 
-The bespoke, identity-first Report view (masthead, thesis hero, stage sections, marginalia) still does not use shadcn — that design intentionally doesn't fit shadcn's card-and-panel defaults, and the reasoning in the original spec (a visual identity that couldn't be mistaken for any other tool) still holds there. shadcn was pulled in for exactly the case the original spec predicted: utility surfaces (theme switching, and available for future form controls) where consistency matters more than novelty, plus the CSS-variable bridge in `globals.css` (`--color-primary`, `--color-border`, `--color-ring`, etc., all mapped onto the ledger-paper token set) so any shadcn component dropped in later automatically inherits the same palette instead of shadcn's own defaults.
+The report's masthead, findings, and stage ledger retain their custom layout
+and fonts. Findings display their description, reason, and recommendation.
+Narrow ledger rows stack metadata and actions rather than clipping them.
+Importing opens a native modal loading dialog, making the background inert,
+then restores focus to the slot action or pool heading. Import errors include a
+recovery instruction and are associated with their input.
 
 ## Design plan
 
@@ -57,9 +62,9 @@ The bespoke, identity-first Report view (masthead, thesis hero, stage sections, 
 | `ink` | `#1B1F17` | `#E9EDE1` | Primary text |
 | `ink-soft` | `#5C6450` | `#A3AB92` | Secondary text — captions, artist credits, reasons |
 | `mark` | `#8C2F2F` | `#D9776A` | Annotation ink — finding glyphs and emphasis, oxblood |
-| `brass` | `#B5742A` | `#D69A52` | The one interactive/accent color — slot codes, stage numerals, focus ring, selection |
+| `brass` | `#8A551D` | `#D69A52` | The one interactive/accent color — slot codes, stage numerals, focus ring, selection |
 
-Still six colors doing the same jobs the original spec described (paper, line, ink, ink-soft for structure; mark = "the engine flagged this," brass = "you can act on this"). The set now has a verified dark-mode pairing (`app/globals.css`'s `:root`/`.dark` blocks), toggled via `components/ui/theme-switch.tsx`, that preserves the same relative contrast and role assignments rather than inverting to a generic dark theme. Deliberately still not the AI-default cream-serif-terracotta combination, not nameless near-black, and not a literal newspaper — it's ledger paper, picked because the subject is a sheet of structured records being audited line by line, the same way an accountant's ledger is.
+Still six colors doing the same jobs the original spec described (paper, line, ink, ink-soft for structure; mark = "the engine flagged this," brass = "you can act on this"). The set now has a verified dark-mode pairing (`app/globals.css`'s `:root`/`[data-theme="dark"]` blocks), toggled via `components/ui/theme-switch.tsx`, that preserves the same relative contrast and role assignments rather than inverting to a generic dark theme. Deliberately still not the AI-default cream-serif-terracotta combination, not nameless near-black, and not a literal newspaper — it's ledger paper, picked because the subject is a sheet of structured records being audited line by line, the same way an accountant's ledger is.
 
 Mod categories (NM/HD/HR/DT/FM/TB) additionally get their own desaturated accent tokens (`--mod-nm`, `--mod-hd`, etc., `--mod-tb` reusing `--brass`) layered on top of this palette, used for the small category dots in the wizard and pool builder and for slot-row accent styling once a beatmap has cover art (`frontend/lib/beatmap-format.ts`'s `modAccentColor`/`slotAccentStyle`).
 
