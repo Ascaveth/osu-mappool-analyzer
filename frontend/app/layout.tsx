@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
@@ -31,6 +31,8 @@ export const metadata: Metadata = {
   description: SITE_TAGLINE,
 };
 
+export const viewport: Viewport = { colorScheme: "light dark" };
+
 /**
  * Renders the application root layout.
  *
@@ -49,10 +51,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="theme-switcher">
+        <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <header className="theme-switcher" aria-label="Appearance">
             <ThemeSwitch />
-          </div>
+          </header>
           {children}
           <Footer />
         </ThemeProvider>

@@ -36,8 +36,12 @@ export function MarginNote({
         {GLYPH[citation.finding.severity]}
       </span>
       <div className="note-body">
-        <p className="note-text">{capitalize(citation.finding.description)}.</p>
+        <p className="note-text">{capitalize(citation.finding.description)}</p>
         {locationLabel && <span className="note-source">{locationLabel}</span>}
+        {citation.finding.reason && <p className="note-why">{citation.finding.reason}</p>}
+        {citation.finding.recommendation && (
+          <p className="note-why"><strong>Suggestion:</strong> {citation.finding.recommendation}</p>
+        )}
       </div>
     </div>
   );

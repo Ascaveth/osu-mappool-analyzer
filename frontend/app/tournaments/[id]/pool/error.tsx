@@ -16,7 +16,7 @@ export default function PoolError({
 
   return (
     <main className="programme">
-      <div className="alert" role="alert">
+      <div className="alert alert-error alert-soft" role="alert">
         <span className="alert-icon" aria-hidden="true">▲</span>
         <p className="alert-text">
           Something went wrong loading this pool. Please try again.
