@@ -252,3 +252,40 @@ test("stage bulk paste retains preview, import locking, and focus restoration", 
   await expect(page.getByRole("button", { name: "Run Analysis" })).toBeDisabled();
   await expectRowsToFit(page);
 });
+
+test("partial stage import retains failed input and allows a single Slot retry", async ({ page }) => {
+  await openPool(page);
+  let failedAttempts = 0;
+  let successfulMapRequests = 0;
+  await page.route("**/api/osu-proxy*", (route) => {
+    const id = new URL(route.request().url()).searchParams.get("id");
+    if (id === "3176982" && failedAttempts++ === 0) {
+      return route.fulfill({ status: 503, body: "Provider unavailable" });
+    }
+    if (id === "3176983") successfulMapRequests++;
+    return route.fulfill({
+      body: "osu file format v14\n[Metadata]\nTitle:Retry fixture\nArtist:Artist\nCreator:Mapper\nVersion:Hard\n[Difficulty]\nApproachRate:9\nOverallDifficulty:8\nCircleSize:4\nHPDrainRate:5\n",
+    });
+  });
+  const bulkInput = page.getByLabel("Bulk paste beatmap IDs", { exact: false }).first();
+  await bulkInput.fill("3176982\n3176983");
+  await page.getByRole("button", { name: "Preview mapping", exact: true }).first().click();
+  await page.getByRole("button", { name: "Apply 2 to Qualifiers", exact: true }).click();
+
+  await expect(page.getByText("1 / 4 slots filled", { exact: false })).toBeVisible();
+  await expect(bulkInput).toHaveValue("");
+  await expect(bulkInput).toBeFocused();
+  await expect(page.getByText("Confirm mapping (2 slots)")).toHaveCount(0);
+  const failedInput = page.getByLabel("Beatmap URL or ID for slot NM1", { exact: true }).first();
+  await expect(failedInput).toHaveValue("3176982");
+  await expect(failedInput).toHaveAccessibleDescription(/Provider unavailable/);
+
+  const retry = page.getByRole("button", { name: "Import and assign beatmap to slot NM1", exact: true }).first();
+  await retry.click();
+
+  await expect(page.getByText("2 / 4 slots filled", { exact: false })).toBeVisible();
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Clear beatmap from slot NM1", exact: true }).first()).toBeFocused();
+  expect(failedAttempts).toBe(2);
+  expect(successfulMapRequests).toBe(1);
+});
