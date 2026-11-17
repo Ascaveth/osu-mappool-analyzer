@@ -169,11 +169,14 @@ CI runs this command in `.github/workflows/backend-tests.yml`. The frontend has 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Add Postgres persistence. Storage is currently in memory only.
-- [ ] Improve the backend analyzers and the reports they produce for submitted mappools.
-- [ ] Import mappools from Google Sheets, where tournaments often publish their pool lists.
+- [ ] Persist tournament data so it survives backend restarts.
+- [ ] Improve detection of difficulty spikes, weak progression, repeated map styles, and missing skill coverage.
+- [ ] Make reports explain each finding and suggest changes mappoolers can act on.
+- [ ] Validate analysis results against real tournament pools and feedback from mappoolers.
+- [ ] Import mappools from Google Sheets.
+- [ ] Compare pools across tournaments or editions to identify changes in difficulty and composition.
 
-See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) for the full list of proposed features and known gaps.
+See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) for proposed features and known gaps.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
