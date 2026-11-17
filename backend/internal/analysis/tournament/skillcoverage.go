@@ -188,7 +188,7 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		taxonomy = DefaultTaxonomy()
 	}
 
-	filledSlots := 0
+	filledSlots, skippedSlots := 0, 0
 	// skillsetCounts can sum to more than filledSlots: a beatmap matching
 	// multiple rules counts toward every matched skillset, but only once
 	// toward filledSlots. Skillset shares therefore do not partition filled
@@ -200,8 +200,12 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 			if slot.Beatmap == nil {
 				continue
 			}
+			profile, ok := pattern.ComputePlacementSkillsetProfile(slot.Beatmap, c.Name)
+			if !ok {
+				skippedSlots++
+				continue
+			}
 			filledSlots++
-			profile := pattern.ComputeSkillsetProfile(slot.Beatmap)
 
 			matched := false
 			for _, rule := range taxonomy {
@@ -217,14 +221,19 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	}
 
 	metrics := map[string]float64{
-		"filled_slots":       float64(filledSlots),
-		"distinct_skillsets": float64(len(skillsetCounts)),
+		"filled_slots":               float64(filledSlots + skippedSlots),
+		"analyzed_slots":             float64(filledSlots),
+		"skipped_slots_no_fixed_mod": float64(skippedSlots),
+		"distinct_skillsets":         float64(len(skillsetCounts)),
 	}
 	if filledSlots == 0 {
-		return analysis.Result{Metrics: metrics}, nil
+		return analysis.Result{Metrics: metrics, Findings: partialSkillFindings(skippedSlots)}, nil
 	}
 
 	var findings []domain.Finding
+	if skippedSlots > 0 {
+		findings = append(findings, partialSkillFinding())
+	}
 
 	sortedSkillsets := make([]Skillset, 0, len(skillsetCounts))
 	for s := range skillsetCounts {
@@ -247,13 +256,13 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	if maxSkillset != "" && maxSkillset != skillsetUnclassified && maxShare > skillsetMajorityThreshold {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
-			Description:    fmt.Sprintf("skillset %q accounts for %.0f%% of this stage's filled slots", maxSkillset, maxShare*100),
+			Description:    fmt.Sprintf("skillset %q accounts for %.0f%% of this stage's analyzed slots", maxSkillset, maxShare*100),
 			Reason:         "a pool skewed toward one skillset systematically disadvantages players weak in that one area every match, regardless of how varied the pool's difficulty numbers are",
 			Recommendation: "select at least one beatmap from an under-represented skillset for this stage",
 		})
 	}
 
-	if filledSlots >= minSlotsForCoverageJudgment {
+	if skippedSlots == 0 && filledSlots >= minSlotsForCoverageJudgment {
 		var missing []string
 		for _, rule := range taxonomy {
 			if skillsetCounts[rule.Skillset] == 0 {

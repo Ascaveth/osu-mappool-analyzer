@@ -3,6 +3,8 @@ package pattern
 import (
 	"sort"
 
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/modmap"
+
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
@@ -127,4 +129,18 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 	}
 
 	return profile
+}
+
+// ComputePlacementSkillsetProfile resolves fixed mods without mutating shared source data.
+// Run grouping uses beat-relative timing, so scaling both note times and beat
+// lengths leaves runs unchanged. Distances remain osu!pixels, not CS-normalized.
+// HD/FL visibility demands are not modeled.
+func ComputePlacementSkillsetProfile(bm *domain.Beatmap, category string) (SkillsetProfile, bool) {
+	mods, ok := modmap.FromCategoryName(category)
+	if !ok || bm == nil {
+		return SkillsetProfile{}, false
+	}
+	profile := ComputeSkillsetProfile(bm)
+	profile.BPM = modmap.EffectiveDifficultyFor(bm.AR, bm.OD, bm.CS, bm.HP, bm.BPM, bm.LengthSeconds, mods).BPM
+	return profile, true
 }

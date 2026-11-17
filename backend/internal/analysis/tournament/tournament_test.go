@@ -507,7 +507,7 @@ func TestSkillCoverageAnalyzer_FlagsSkillsetOverload(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", jumpBeatmap("bm1")),
 					slot("s2", jumpBeatmap("bm2")),
@@ -545,7 +545,7 @@ func TestSkillCoverageAnalyzer_ClassifiesIrregularJumpstreamAsTech(t *testing.T)
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{slot("s1", jumpstreamBeatmap("bm1"))},
 			}},
 		}},
@@ -568,7 +568,7 @@ func TestSkillCoverageAnalyzer_ClassifiesRegularJumpstreamAsStreamNotTech(t *tes
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{slot("s1", regularJumpstreamBeatmap("bm1"))},
 			}},
 		}},
@@ -594,7 +594,7 @@ func TestSkillCoverageAnalyzer_ClassifiesAltBandBPMAsAlt(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{slot("s1", altBeatmap("bm1"))},
 			}},
 		}},
@@ -617,7 +617,7 @@ func TestSkillCoverageAnalyzer_DoesNotClassifyFastBurstAsAlt(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{slot("s1", fastBurstBeatmap("bm1"))},
 			}},
 		}},
@@ -640,7 +640,7 @@ func TestSkillCoverageAnalyzer_FlagsMissingSkillset(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", jumpBeatmap("bm1")),
 					slot("s2", jumpBeatmap("bm2")),
@@ -674,7 +674,7 @@ func TestSkillCoverageAnalyzer_TooFewSlotsSkipsMissingSkillsetFinding(t *testing
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", jumpBeatmap("bm1")),
 				},
@@ -705,7 +705,7 @@ func TestSkillCoverageAnalyzer_MixedSkillsetsCountFilledSlotsOnce(t *testing.T) 
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", jumpBeatmap("bm1")),
 					slot("s2", streamBeatmap("bm2")),
@@ -731,7 +731,7 @@ func TestSkillCoverageAnalyzer_CustomTaxonomyOverrideRespected(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", jumpBeatmap("bm1")),
 					slot("s2", jumpBeatmap("bm2")),
@@ -762,7 +762,7 @@ func TestSkillCoverageAnalyzer_NoFilledSlotsDoesNotPanic(t *testing.T) {
 		ID: "t-1",
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
-			Categories: []domain.Category{{ID: "cat-1", Order: 1, Slots: []domain.Slot{{ID: "s1"}}}},
+			Categories: []domain.Category{{ID: "cat-1", Name: "NM", Order: 1, Slots: []domain.Slot{{ID: "s1"}}}},
 		}},
 	}
 
@@ -822,9 +822,9 @@ func TestSkillRedundancyAnalyzer_DiverseProfilesProduceNoFindings(t *testing.T) 
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{
-				{ID: "cat-nm", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
-				{ID: "cat-hr", Order: 2, Slots: []domain.Slot{slot("s2", streamBeatmap("bm2"))}},
-				{ID: "cat-dt", Order: 3, Slots: []domain.Slot{slot("s3", unclassifiedBeatmap("bm3"))}},
+				{ID: "cat-nm", Name: "NM", Order: 1, Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))}},
+				{ID: "cat-hr", Name: "NM", Order: 2, Slots: []domain.Slot{slot("s2", streamBeatmap("bm2"))}},
+				{ID: "cat-dt", Name: "NM", Order: 3, Slots: []domain.Slot{slot("s3", unclassifiedBeatmap("bm3"))}},
 			},
 		}},
 	}
@@ -849,7 +849,7 @@ func TestSkillRedundancyAnalyzer_AllIdenticalDimensionsDoesNotPanic(t *testing.T
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{
 					slot("s1", unclassifiedBeatmap("bm1")),
 					slot("s2", unclassifiedBeatmap("bm2")),
@@ -878,7 +878,7 @@ func TestSkillRedundancyAnalyzer_TooFewSlotsDoesNotPanic(t *testing.T) {
 		Stages: []domain.Stage{{
 			ID: "stage-1", Order: 1,
 			Categories: []domain.Category{{
-				ID: "cat-1", Order: 1,
+				ID: "cat-1", Name: "NM", Order: 1,
 				Slots: []domain.Slot{slot("s1", jumpBeatmap("bm1"))},
 			}},
 		}},
@@ -905,7 +905,7 @@ func TestSkillRedundancyAnalyzer_CapsFindingsAtMaxRedundancyFindings(t *testing.
 	for i := 0; i < 8; i++ {
 		id := stageID(i)
 		categories = append(categories, domain.Category{
-			ID: "cat-" + id, Order: i + 1,
+			ID: "cat-" + id, Name: "NM", Order: i + 1,
 			Slots: []domain.Slot{slot("s-"+id, jumpBeatmap("bm-"+id))},
 		})
 	}
@@ -951,5 +951,38 @@ func TestTournamentAnalyzers_RunTogetherInEngine(t *testing.T) {
 	// (SkillRedundancy) + 3 category-scoped (Balance) = 16.
 	if len(results) != 16 {
 		t.Errorf("len(results) = %d, want 16", len(results))
+	}
+}
+
+func TestPlacementSkillCallers(t *testing.T) {
+	bm := streamBeatmap("shared")
+	bm.BPM = 140
+	tournament := &domain.Tournament{Stages: []domain.Stage{{ID: "stage", Categories: []domain.Category{
+		{Name: "NM", Slots: []domain.Slot{slot("nm", bm)}},
+		{Name: "DT", Slots: []domain.Slot{slot("dt", bm)}},
+		{Name: "FM", Slots: []domain.Slot{slot("fm", bm)}},
+		{Name: "TB", Slots: []domain.Slot{slot("tb", bm)}},
+		{Name: "HREZ", Slots: []domain.Slot{slot("invalid", bm)}},
+	}}}}
+	in := analysis.Input{Tournament: tournament, Scope: domain.Scope{Type: domain.ScopeStage, ID: "stage"}}
+	coverage, err := (SkillCoverageAnalyzer{}).Analyze(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coverage.Metrics["skillset_count_alt"] != 1 || coverage.Metrics["analyzed_slots"] != 2 || coverage.Metrics["skipped_slots_no_fixed_mod"] != 3 {
+		t.Fatalf("coverage: %+v", coverage)
+	}
+	redundancy, err := (SkillRedundancyAnalyzer{}).Analyze(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if redundancy.Metrics["redundant_pair_count"] != 0 || redundancy.Metrics["analyzed_slots"] != 2 || redundancy.Metrics["skipped_slots_no_fixed_mod"] != 3 {
+		t.Fatalf("redundancy: %+v", redundancy)
+	}
+	if len(redundancy.Findings) != 1 {
+		t.Fatalf("missing partial-analysis warning: %+v", redundancy)
+	}
+	if bm.BPM != 140 {
+		t.Fatal("source BPM mutated")
 	}
 }

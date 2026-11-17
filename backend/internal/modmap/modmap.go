@@ -109,6 +109,9 @@ func FromCategoryName(name string) (Mods, bool) {
 		}
 		combo |= mods
 	}
+	if combo&ModHardRock != 0 && combo&ModEasy != 0 || combo&ModDoubleTime != 0 && combo&ModHalfTime != 0 {
+		return 0, false
+	}
 	return combo, true
 }
 
