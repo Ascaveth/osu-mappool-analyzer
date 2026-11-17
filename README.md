@@ -169,12 +169,13 @@ CI runs this command in `.github/workflows/backend-tests.yml`. The frontend has 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Persist tournament data so it survives backend restarts.
-- [ ] Improve detection of difficulty spikes, weak progression, repeated map styles, and missing skill coverage.
-- [ ] Make reports explain each finding and suggest changes mappoolers can act on.
-- [ ] Validate analysis results against real tournament pools and feedback from mappoolers.
-- [ ] Import mappools from Google Sheets.
-- [ ] Compare pools across tournaments or editions to identify changes in difficulty and composition.
+- [x] Detect OD progression regressions and spikes across stages ([#2](https://github.com/Ascaveth/osu-mappool-analyzer/pull/2)), star-rating spread issues within stages ([#22](https://github.com/Ascaveth/osu-mappool-analyzer/pull/22)), similar skill profiles ([#28](https://github.com/Ascaveth/osu-mappool-analyzer/pull/28)), and missing skill coverage ([#20](https://github.com/Ascaveth/osu-mappool-analyzer/pull/20)).
+- [x] Show findings with reasons and suggested changes ([#2](https://github.com/Ascaveth/osu-mappool-analyzer/pull/2)), and resolve affected locations in reports ([#30](https://github.com/Ascaveth/osu-mappool-analyzer/pull/30)).
+- [ ] Persist tournament data so it survives backend restarts. [#41](https://github.com/Ascaveth/osu-mappool-analyzer/issues/41)
+- [ ] Show analysis coverage and insufficient-data limits in reports. [#42](https://github.com/Ascaveth/osu-mappool-analyzer/issues/42)
+- [ ] Validate analysis results against real tournament pools and feedback from mappoolers. [#43](https://github.com/Ascaveth/osu-mappool-analyzer/issues/43)
+- [ ] Import mappools from Google Sheets. [#44](https://github.com/Ascaveth/osu-mappool-analyzer/issues/44)
+- [ ] Compare pools across tournaments or editions to identify changes in difficulty and composition. [#45](https://github.com/Ascaveth/osu-mappool-analyzer/issues/45)
 
 See the [open issues](https://github.com/Ascaveth/osu-mappool-analyzer/issues) for proposed features and known gaps.
 
