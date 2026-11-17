@@ -1,3 +1,4 @@
+import { readTournament, toTournament, type WireTournament, type WireSlot } from "./tournament-read";
 // Real ApiClient backed by the Go server's REST API (docs/api/openapi.yaml).
 // Each method fetches the corresponding endpoint and translates the wire
 // (snake_case) shape into lib/types.ts's camelCase presentation types — the
@@ -5,11 +6,8 @@
 // syntax on the backend, just done here in TypeScript.
 import type {
   Tournament,
-  Stage,
-  Category,
   Slot,
   Beatmap,
-  EffectiveDifficulty,
   Report,
   Citation,
   Finding,
@@ -24,45 +22,6 @@ interface WireProblem {
   title: string;
   status: number;
   detail?: string;
-}
-
-interface WireEffectiveDifficulty {
-  ar: number;
-  od: number;
-  cs: number;
-  hp: number;
-  bpm: number;
-  length_seconds: number;
-  star_rating: number | null;
-}
-
-interface WireSlot {
-  id: string;
-  position: number;
-  beatmap_id: string | null;
-  effective_difficulty: WireEffectiveDifficulty | null;
-}
-
-interface WireCategory {
-  id: string;
-  name: string;
-  order: number;
-  slots: WireSlot[];
-}
-
-interface WireStage {
-  id: string;
-  name: string;
-  order: number;
-  categories: WireCategory[];
-  projected_star_rating: number | null;
-}
-
-interface WireTournament {
-  id: string;
-  name: string;
-  edition: string;
-  stages: WireStage[];
 }
 
 interface WireBeatmap {
@@ -151,68 +110,6 @@ function toBeatmap(w: WireBeatmap, coverUrl?: string): Beatmap {
   };
 }
 
-function toEffectiveDifficulty(w: WireEffectiveDifficulty | null): EffectiveDifficulty | null {
-  if (!w) return null;
-  return {
-    ar: w.ar,
-    od: w.od,
-    cs: w.cs,
-    hp: w.hp,
-    bpm: w.bpm,
-    lengthSeconds: w.length_seconds,
-    starRating: w.star_rating,
-  };
-}
-
-function toSlot(w: WireSlot, categoryName: string, beatmapsById: Map<string, Beatmap>): Slot {
-  return {
-    id: w.id,
-    code: `${categoryName}${w.position}`,
-    beatmap: w.beatmap_id ? (beatmapsById.get(w.beatmap_id) ?? null) : null,
-    effectiveDifficulty: toEffectiveDifficulty(w.effective_difficulty),
-  };
-}
-
-function toCategory(w: WireCategory, beatmapsById: Map<string, Beatmap>): Category {
-  return {
-    id: w.id,
-    name: w.name,
-    order: w.order,
-    slots: w.slots.map((s) => toSlot(s, w.name, beatmapsById)),
-  };
-}
-
-function toStage(w: WireStage, beatmapsById: Map<string, Beatmap>): Stage {
-  return {
-    id: w.id,
-    name: w.name,
-    order: w.order,
-    categories: w.categories.map((c) => toCategory(c, beatmapsById)),
-    projectedStarRating: w.projected_star_rating ?? null,
-  };
-}
-
-function toTournament(w: WireTournament, beatmapsById: Map<string, Beatmap>): Tournament {
-  return {
-    id: w.id,
-    name: w.name,
-    edition: w.edition,
-    stages: w.stages.map((s) => toStage(s, beatmapsById)),
-  };
-}
-
-function collectBeatmapIds(w: WireTournament): string[] {
-  const ids = new Set<string>();
-  for (const stage of w.stages) {
-    for (const cat of stage.categories) {
-      for (const slot of cat.slots) {
-        if (slot.beatmap_id) ids.add(slot.beatmap_id);
-      }
-    }
-  }
-  return [...ids];
-}
-
 function toFinding(w: WireFinding): Finding {
   return {
     severity: w.severity,
@@ -296,8 +193,7 @@ export function createRestClient(baseUrl: string): ApiClient {
     async getTournament(id: string): Promise<Tournament> {
       const res = await request(baseUrl, `/tournaments/${id}`);
       const wire = (await res.json()) as WireTournament;
-      const beatmapsById = await fetchBeatmapsById(collectBeatmapIds(wire));
-      return toTournament(wire, beatmapsById);
+      return readTournament(wire, fetchBeatmapsById);
     },
 
     async importBeatmapFromUrl(url: string): Promise<Beatmap> {
