@@ -20,16 +20,20 @@ import (
 // the same private helpers (landingObjects, distance, localBeatLengthMs)
 // those analyzers already use, so the two computations cannot drift apart.
 type SkillsetProfile struct {
-	BPM                float64
-	AvgJumpDistance    float64
-	MaxJumpDistance    float64
-	StreamCount        int
-	LongestRunLength   int
-	MaxStreamSpacingCV float64
-	AvgAnchorCount     float64
-	ReverseSliderRatio float64
-	SpinnerDensity     float64
-	ObjectCount        int
+	TappingRate          float64
+	StreamNoteRatio      float64
+	TappingConcentration float64
+	AimSpeed             float64
+	BPM                  float64
+	AvgJumpDistance      float64
+	MaxJumpDistance      float64
+	StreamCount          int
+	LongestRunLength     int
+	MaxStreamSpacingCV   float64
+	AvgAnchorCount       float64
+	ReverseSliderRatio   float64
+	SpinnerDensity       float64
+	ObjectCount          int
 }
 
 // ComputeSkillsetProfile derives a SkillsetProfile from a beatmap's raw hit
@@ -38,6 +42,9 @@ type SkillsetProfile struct {
 // profile, matching the zero-count early returns every pattern Analyzer in
 // this package already uses.
 func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
+	if bm == nil {
+		return SkillsetProfile{}
+	}
 	profile := SkillsetProfile{BPM: bm.BPM, ObjectCount: len(bm.HitObjects)}
 
 	// Jump distance, reusing landingObjects/distance exactly as
@@ -81,6 +88,7 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 				}
 				if length >= streamMinLength {
 					streamCount++
+					profile.StreamNoteRatio += float64(length) / float64(len(bm.HitObjects))
 					if cv := spacingCV(run); cv > maxSpacingCV {
 						maxSpacingCV = cv
 					}
@@ -128,6 +136,7 @@ func ComputeSkillsetProfile(bm *domain.Beatmap) SkillsetProfile {
 		profile.SpinnerDensity = totalDurationSeconds / float64(bm.LengthSeconds)
 	}
 
+	computeIntensity(bm, &profile, 1, bm.CS)
 	return profile
 }
 
@@ -142,5 +151,13 @@ func ComputePlacementSkillsetProfile(bm *domain.Beatmap, category string) (Skill
 	}
 	profile := ComputeSkillsetProfile(bm)
 	profile.BPM = modmap.EffectiveDifficultyFor(bm.AR, bm.OD, bm.CS, bm.HP, bm.BPM, bm.LengthSeconds, mods).BPM
+	rate := 1.0
+	if mods&modmap.ModDoubleTime != 0 {
+		rate = 1.5
+	} else if mods&modmap.ModHalfTime != 0 {
+		rate = .75
+	}
+	effective := modmap.EffectiveDifficultyFor(bm.AR, bm.OD, bm.CS, bm.HP, bm.BPM, bm.LengthSeconds, mods)
+	computeIntensity(bm, &profile, rate, effective.CS)
 	return profile, true
 }
