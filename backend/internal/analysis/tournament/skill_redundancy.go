@@ -53,24 +53,26 @@ func (SkillRedundancyAnalyzer) ScopeType() domain.ScopeType { return domain.Scop
 // are deliberately excluded: MaxJumpDistance is redundant with
 // AvgJumpDistance for this purpose, and ObjectCount describes beatmap
 // length, not mechanical skill.
-type skillProfileVector [7]float64
+type skillProfileVector [9]float64
 
 func vectorFromProfile(p pattern.SkillsetProfile) skillProfileVector {
 	return skillProfileVector{
-		p.AvgJumpDistance,
-		float64(p.StreamCount),
+		p.AimSpeed,
+		p.StreamNoteRatio,
 		float64(p.LongestRunLength),
 		p.AvgAnchorCount,
 		p.ReverseSliderRatio,
 		p.SpinnerDensity,
 		p.BPM,
+		p.TappingRate,
+		p.TappingConcentration,
 	}
 }
 
 // Fixed feature scales keep pair distances independent of stage composition.
-// shortcut: scales are provisional heuristics; revisit with Task 3 features and Task 5 calibration.
-// Units: osu pixels, runs, notes, anchors, ratio, ratio, BPM.
-var redundancyFeatureScales = skillProfileVector{200, 10, 32, 4, 1, 1, 100}
+// shortcut: scales are provisional heuristics; revisit with pooler calibration.
+// Units: diameters/s, ratio, notes, anchors, ratio, ratio, BPM, notes/s, ratio.
+var redundancyFeatureScales = skillProfileVector{20, 1, 32, 4, 1, 1, 100, 10, 1}
 
 func normalizeVectors(vectors []skillProfileVector) []skillProfileVector {
 	normalized := make([]skillProfileVector, len(vectors))
@@ -154,7 +156,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 				}
 				pairs = append(pairs, redundantPair{
 					slotACode: a, slotBCode: b,
-					evidence: fmt.Sprintf("Scaled feature differences (absolute delta / provisional scale): jump distance %.3f, stream count %.3f, longest run %.3f, anchors %.3f, reverse ratio %.3f, spinner density %.3f, effective BPM %.3f; RMS %.4f < %.2f. Scales and threshold are uncalibrated heuristics.", math.Abs(normalized[i][0]-normalized[j][0]), math.Abs(normalized[i][1]-normalized[j][1]), math.Abs(normalized[i][2]-normalized[j][2]), math.Abs(normalized[i][3]-normalized[j][3]), math.Abs(normalized[i][4]-normalized[j][4]), math.Abs(normalized[i][5]-normalized[j][5]), math.Abs(normalized[i][6]-normalized[j][6]), d, redundancySimilarityThreshold),
+					evidence: fmt.Sprintf("Scaled feature differences (absolute delta / provisional scale): aim speed %.3f, stream note ratio %.3f, longest run %.3f, anchors %.3f, reverse ratio %.3f, spinner density %.3f, effective BPM %.3f, tapping rate %.3f, tapping concentration %.3f; RMS %.4f < %.2f. Scales and threshold are uncalibrated heuristics.", math.Abs(normalized[i][0]-normalized[j][0]), math.Abs(normalized[i][1]-normalized[j][1]), math.Abs(normalized[i][2]-normalized[j][2]), math.Abs(normalized[i][3]-normalized[j][3]), math.Abs(normalized[i][4]-normalized[j][4]), math.Abs(normalized[i][5]-normalized[j][5]), math.Abs(normalized[i][6]-normalized[j][6]), math.Abs(normalized[i][7]-normalized[j][7]), math.Abs(normalized[i][8]-normalized[j][8]), d, redundancySimilarityThreshold),
 					distance: d,
 				})
 			}

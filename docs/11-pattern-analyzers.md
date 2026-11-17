@@ -61,3 +61,25 @@ Run with:
 ```sh
 cd backend && go test ./...
 ```
+
+### Placement intensity features
+
+Task 3 uses adjacent circles in chronological order. Sliders and spinners
+break adjacency; their tracking and visibility demands are not modeled.
+TappingRate is the arithmetic mean of reciprocal positive intervals, in
+notes/second. Actual timestamps account for local BPM changes. AimSpeed
+is mean start-position distance divided by circle diameter and interval,
+in diameters/second. Diameter is `108.8 - 8.96 * effective CS` pixels.
+StreamNoteRatio is notes in existing qualifying stream runs divided by all
+hit objects. It replaces raw run count in similarity, avoiding a direct
+map-length penalty. Longest run remains a sustained-duration proxy.
+TappingConcentration is the largest sum of reciprocal intervals in one
+10-second bin divided by their total. Bins start at the first object and
+use effective playback time. This measures concentration, not section
+order or a full strain model. Maps shorter than one bin have concentration
+1 when intervals exist. Empty/single-object inputs have zero intensity.
+DT/HT scale intervals; HR/EZ change diameter. Fixed-mod eligibility is
+unchanged. Similarity scales are provisional: aim speed 20 diameters/s,
+stream ratio 1, tapping rate 10 notes/s, concentration 1. No pooler accuracy
+claim follows from these synthetic tests. Existing persisted analyses
+must be regenerated after upgrading the algorithm.

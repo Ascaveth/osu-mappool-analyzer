@@ -8,7 +8,7 @@ import (
 func TestSimilarityFixedScales(t *testing.T) {
 	a := skillProfileVector{200, 10, 32, 4, .5, .2, 140}
 	b := a
-	b[0]++
+	b[0] += .1
 	base := normalizeVectors([]skillProfileVector{a, b})
 	distance := rmsDistance(base[0], base[1])
 	if distance <= 0 || distance >= .01 {
