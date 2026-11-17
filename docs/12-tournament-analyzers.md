@@ -36,7 +36,7 @@ Why OD, not Star Rating: the roadmap's progression question is fundamentally abo
 
 ### BalanceAnalyzer (Category scope)
 
-The tournament-quality counterpart to Phase 6's `BPMRangeAnalyzer`, which only ever checked BPM. `BalanceAnalyzer` checks three different axes: AR, OD, and slider ratio: each independently, using the same zero-variance convention as `BPMRangeAnalyzer`: a Warning fires only when every beatmap in the category shares the *exact same* value on that axis (with more than one slot filled). Slider ratio (proportion of objects that are sliders, already computed by Phase 4's normalizer) is used as the closest available proxy for "tap-heavy vs. slider-heavy" mapping emphasis: the closest thing to a "is one skill overrepresented" signal available without a pattern-classification model.
+The tournament-quality counterpart to Phase 6's `BPMRangeAnalyzer`, which only ever checked BPM. `BalanceAnalyzer` checks three different axes: AR, OD, and slider ratio ranges are descriptive. Identical values produce Info findings because uniform settings may be intentional; no configured target requires variation.
 
 ### DiversityAnalyzer (Stage scope)
 
@@ -47,14 +47,11 @@ Reports BPM, mapper, and song diversity across an entire stage (all categories c
 
 ### SkillCoverageAnalyzer (Stage scope)
 
-Classifies each filled slot's beatmap into one or more skillset tags (`aim`, `jump`, `stream`, `tech`, `alt`, or `unclassified`) using `pattern.ComputeSkillsetProfile`: a shared pure function in `internal/analysis/pattern` that recomputes the same jump-distance, stream/burst-run, and slider-complexity primitives `JumpDistanceAnalyzer`/`StreamBurstAnalyzer`/`SliderComplexityAnalyzer` already report independently, rather than calling those analyzers directly (analyzers never depend on each other; see [docs/09-analysis-engine-specification.md](09-analysis-engine-specification.md)). Reports `filled_slots`, `distinct_skillsets`, `skillset_count_<tag>` per present tag, and `max_skillset_share`. Two findings:
+Uses placement-aware heuristic tags and preserves mixed skillsets. A stream tag requires at least 50% stream notes, a provisional dominance convention rather than a calibrated player-demand model. Irregular wide streams can indicate tech; slider anchor counts alone cannot. Tech findings include measured pattern evidence.
 
-- Skillset overload: Warning when one skillset's share of filled slots exceeds 60% (`skillsetMajorityThreshold`, set above `categoryMajorityThreshold` since skillset tags don't partition filled slots the way categories do: a beatmap can match more than one rule).
-- Missing skillset: Warning when a taxonomy skillset has zero representation in a stage with at least 3 filled slots (`minSlotsForCoverageJudgment`, avoiding false positives on stages too small to judge against a multi-item taxonomy).
+No coverage target is currently configured. Missing skills are not reported as deficiencies, and tag shares above 60% are informational. Custom taxonomy rules classify patterns and do not establish coverage requirements. No new domain, API, or UI fields are introduced.
 
-This directly targets the most common real-world "unbalanced"/"not fun" mappool complaint found in community feedback (osu! tournament forums, `poolingcore`, established mappooling guides): pools skewing toward one skillset systematically disadvantage players weak in that one area every match, regardless of how varied the pool's raw difficulty numbers are: a distinct problem from `BalanceAnalyzer`'s numeric AR/OD/slider-ratio variance check.
-
-Taxonomy is a named default, not a hardcoded assumption: `DefaultTaxonomy()` ships as documented, revisitable Go constants (mirroring `spikeMultiplier`, `streamMinLength`, `categoryMajorityThreshold`), but `SkillCoverageAnalyzer.Taxonomy` is a public field a caller can override entirely. Full per-tournament user-editable taxonomy: a `domain.Tournament`-level field configurable through the API/UI: is an explicit deferred follow-up: no per-tournament settings surface exists in the domain model today, and this codebase's established precedent is to ship a named default first rather than build configurability speculatively.
+Results explicitly report target unavailability, analyzed slots, skipped ambiguous mods, and slots with fewer than two objects. Empty results do not imply a completed coverage judgment. HD/FL visibility remains unmodeled. Thresholds require pooler calibration.
 
 ### SkillRedundancyAnalyzer (Stage scope)
 

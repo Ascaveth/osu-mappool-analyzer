@@ -55,10 +55,10 @@ func (BalanceAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis.R
 
 		if len(axis.values) > 1 && max-min == 0 {
 			findings = append(findings, domain.Finding{
-				Severity:       domain.SeverityWarning,
+				Severity:       domain.SeverityInfo,
 				Description:    fmt.Sprintf("every beatmap in this category has the identical %s value (%.2f)", describeAxis(axis.name), min),
-				Reason:         fmt.Sprintf("zero variation in %s across a category removes one axis of skill testing the category's slot count suggests it covers", describeAxis(axis.name)),
-				Recommendation: fmt.Sprintf("consider selecting at least one beatmap with a different %s for this category", describeAxis(axis.name)),
+				Reason:         "Identical settings may be intentional; no target requiring variation is configured.",
+				Recommendation: "Review these values against the intended category roles; identical values alone do not require changes.",
 			})
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis/pattern"
@@ -41,15 +40,6 @@ const (
 	// jumpDistanceThreshold (osu!pixels) marks a beatmap's average jump
 	// distance as wide enough to call the map "jump"/"aim"-oriented.
 	jumpDistanceThreshold = 150.0
-
-	// techAnchorCountThreshold marks a beatmap's average slider anchor
-	// count as complex enough to call the map "tech"-oriented. This is one
-	// of two independent tech signals (see DefaultTaxonomy's "tech" rule) —
-	// on its own it only catches slider-shape complexity, not the
-	// rhythm/pattern irregularity the osu! community also calls "tech"
-	// (there is no single agreed-upon definition; see the wiki's own
-	// hedging on the term).
-	techAnchorCountThreshold = 4.0
 
 	// lowReverseSliderRatio marks a beatmap as slider-simple enough (few
 	// reverse sliders) that wide jump spacing reads as "aim" rather than
@@ -110,19 +100,11 @@ const (
 func DefaultTaxonomy() []SkillsetRule {
 	return []SkillsetRule{
 		{Skillset: "stream", Match: func(p pattern.SkillsetProfile) bool {
-			return p.StreamCount > 0
+			return p.StreamCount > 0 && p.StreamNoteRatio >= 0.5
 		}},
 		{Skillset: "tech", Match: func(p pattern.SkillsetProfile) bool {
-			// Two independent tech traits, either sufficient on its own:
-			// slider-shape complexity, or an irregular jumpstream (wide
-			// jumps whose spacing shifts mid-run — see
-			// jumpstreamSpacingCVThreshold's doc comment for why the CV
-			// gate matters: a jumpstream with predictable spacing is
-			// stream-territory, not tech, regardless of how wide the
-			// jumps are). Neither claims to be a complete definition of
-			// "tech" — see techAnchorCountThreshold's doc comment.
-			return p.AvgAnchorCount >= techAnchorCountThreshold ||
-				(p.StreamCount > 0 && p.AvgJumpDistance >= jumpDistanceThreshold && p.MaxStreamSpacingCV >= jumpstreamSpacingCVThreshold)
+			// Irregular wide streams are a heuristic tech signal, not a complete definition.
+			return (p.StreamCount > 0 && p.AvgJumpDistance >= jumpDistanceThreshold && p.MaxStreamSpacingCV >= jumpstreamSpacingCVThreshold)
 		}},
 		{Skillset: "alt", Match: func(p pattern.SkillsetProfile) bool {
 			// BPM band is the defining trait, not run length or the
@@ -147,26 +129,7 @@ func DefaultTaxonomy() []SkillsetRule {
 // than one skillset, so "share" here is looser than a strict majority.
 const skillsetMajorityThreshold = 0.6
 
-// minSlotsForCoverageJudgment is the fewest filled slots a stage needs
-// before "this taxonomy skillset has zero representation" is a meaningful
-// finding rather than noise from a stage that simply doesn't have enough
-// maps yet to cover a multi-item taxonomy (mirrors BalanceAnalyzer's
-// len(values) > 1 guard and ProgressionAnalyzer's len(sequence) < 2 guard).
-const minSlotsForCoverageJudgment = 3
-
-// SkillCoverageAnalyzer reports, per Stage, how filled slots are
-// distributed across a tournament-relevant skillset taxonomy (aim, stream,
-// tech, jump, alt, etc.) — the stage-level counterpart to BalanceAnalyzer's
-// numeric-variance check (AR/OD/slider ratio) and CompositionAnalyzer's
-// category/mapper share check, but for mechanical skill coverage rather
-// than difficulty settings or metadata.
-//
-// This closes the "missing skill coverage" gap named in
-// docs/12-tournament-analyzers.md and docs/03-terminology.md: real-world
-// tournament mappool feedback consistently identifies skillset imbalance
-// (a pool over-indexing on one skillset, e.g. all tech or all aim) as the
-// dominant cause of "unbalanced"/"not fun" complaints — more so than raw
-// difficulty-number variance, which BalanceAnalyzer already covers.
+// SkillCoverageAnalyzer describes heuristic skill tags without assuming a pool target.
 type SkillCoverageAnalyzer struct {
 	// Taxonomy is the ordered list of skillset classification rules this
 	// analyzer evaluates. Nil means DefaultTaxonomy().
@@ -188,7 +151,8 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		taxonomy = DefaultTaxonomy()
 	}
 
-	filledSlots, skippedSlots := 0, 0
+	filledSlots, skippedSlots, insufficientSlots := 0, 0, 0
+	var techFindings []domain.Finding
 	// skillsetCounts can sum to more than filledSlots: a beatmap matching
 	// multiple rules counts toward every matched skillset, but only once
 	// toward filledSlots. Skillset shares therefore do not partition filled
@@ -201,6 +165,10 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 				continue
 			}
 			profile, ok := pattern.ComputePlacementSkillsetProfile(slot.Beatmap, c.Name)
+			if ok && profile.ObjectCount < 2 {
+				insufficientSlots++
+				continue
+			}
 			if !ok {
 				skippedSlots++
 				continue
@@ -211,6 +179,14 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 			for _, rule := range taxonomy {
 				if rule.Match(profile) {
 					skillsetCounts[rule.Skillset]++
+					if rule.Skillset == "tech" {
+						techFindings = append(techFindings, domain.Finding{
+							Severity:       domain.SeverityInfo,
+							Description:    fmt.Sprintf("slot %s matches a heuristic tech rule", slot.ID),
+							Reason:         fmt.Sprintf("stream runs=%d, average jump distance=%.2f osu pixels, maximum stream spacing CV=%.3f, average slider anchors=%.2f; anchors alone do not establish tech", profile.StreamCount, profile.AvgJumpDistance, profile.MaxStreamSpacingCV, profile.AvgAnchorCount),
+							Recommendation: "Review the actual patterns against the intended slot role.",
+						})
+					}
 					matched = true
 				}
 			}
@@ -221,18 +197,25 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	}
 
 	metrics := map[string]float64{
-		"filled_slots":               float64(filledSlots + skippedSlots),
-		"analyzed_slots":             float64(filledSlots),
-		"skipped_slots_no_fixed_mod": float64(skippedSlots),
-		"distinct_skillsets":         float64(len(skillsetCounts)),
+		"filled_slots":                    float64(filledSlots + skippedSlots + insufficientSlots),
+		"analyzed_slots":                  float64(filledSlots),
+		"skipped_slots_no_fixed_mod":      float64(skippedSlots),
+		"skipped_slots_insufficient_data": float64(insufficientSlots),
+		"coverage_target_available":       0,
+		"distinct_skillsets":              float64(len(skillsetCounts)),
 	}
-	if filledSlots == 0 {
-		return analysis.Result{Metrics: metrics, Findings: partialSkillFindings(skippedSlots)}, nil
-	}
-
-	var findings []domain.Finding
+	findings := techFindings
+	findings = append(findings, domain.Finding{
+		Severity:       domain.SeverityInfo,
+		Description:    "coverage target unavailable; missing skills and pool balance are not evaluated",
+		Reason:         fmt.Sprintf("Heuristic tags describe patterns, not required pool roles. Analyzed %d slots; skipped %d without fixed mods and %d with fewer than two objects. Stream dominance requires at least 50%% stream notes. Tech uses irregular wide streams; slider anchors alone are insufficient. HD/FL visibility is not modeled.", filledSlots, skippedSlots, insufficientSlots),
+		Recommendation: "Compare detected patterns with the intended tournament roles before judging coverage.",
+	})
 	if skippedSlots > 0 {
 		findings = append(findings, partialSkillFinding())
+	}
+	if filledSlots == 0 {
+		return analysis.Result{Metrics: metrics, Findings: findings}, nil
 	}
 
 	sortedSkillsets := make([]Skillset, 0, len(skillsetCounts))
@@ -255,29 +238,11 @@ func (a SkillCoverageAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 
 	if maxSkillset != "" && maxSkillset != skillsetUnclassified && maxShare > skillsetMajorityThreshold {
 		findings = append(findings, domain.Finding{
-			Severity:       domain.SeverityWarning,
+			Severity:       domain.SeverityInfo,
 			Description:    fmt.Sprintf("skillset %q accounts for %.0f%% of this stage's analyzed slots", maxSkillset, maxShare*100),
-			Reason:         "a pool skewed toward one skillset systematically disadvantages players weak in that one area every match, regardless of how varied the pool's difficulty numbers are",
-			Recommendation: "select at least one beatmap from an under-represented skillset for this stage",
+			Reason:         "Heuristic tag frequency does not establish a pool target violation or exclusive skill dominance.",
+			Recommendation: "Review this distribution against the intended tournament roles.",
 		})
-	}
-
-	if skippedSlots == 0 && filledSlots >= minSlotsForCoverageJudgment {
-		var missing []string
-		for _, rule := range taxonomy {
-			if skillsetCounts[rule.Skillset] == 0 {
-				missing = append(missing, string(rule.Skillset))
-			}
-		}
-		if len(missing) > 0 {
-			sort.Strings(missing)
-			findings = append(findings, domain.Finding{
-				Severity:       domain.SeverityWarning,
-				Description:    fmt.Sprintf("this stage has no beatmap covering skillset(s): %s", strings.Join(missing, ", ")),
-				Reason:         "a taxonomy skillset with zero representation is a mechanical skill this stage never tests, regardless of how many maps or categories it has",
-				Recommendation: "select at least one beatmap covering each missing skillset for this stage",
-			})
-		}
 	}
 
 	return analysis.Result{Metrics: metrics, Findings: findings}, nil

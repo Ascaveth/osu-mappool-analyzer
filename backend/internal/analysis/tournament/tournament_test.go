@@ -318,6 +318,11 @@ func TestBalanceAnalyzer_FlagsZeroVarianceOnAllAxes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Analyze returned error: %v", err)
 	}
+	for _, f := range result.Findings {
+		if f.Severity != domain.SeverityInfo {
+			t.Fatal("identical settings must be informational")
+		}
+	}
 	if len(result.Findings) != 3 {
 		t.Fatalf("len(Findings) = %d, want 3 (AR, OD, slider_ratio all zero-variance)", len(result.Findings))
 	}
@@ -663,8 +668,8 @@ func TestSkillCoverageAnalyzer_FlagsMissingSkillset(t *testing.T) {
 			found = true
 		}
 	}
-	if !found {
-		t.Error("expected a missing-skillset finding (no stream/tech/alt beatmap present)")
+	if found {
+		t.Error("missing skills must not be judged without a pool target")
 	}
 }
 
@@ -772,8 +777,8 @@ func TestSkillCoverageAnalyzer_NoFilledSlotsDoesNotPanic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Analyze returned error: %v", err)
 	}
-	if len(result.Findings) != 0 {
-		t.Errorf("len(Findings) = %d, want 0", len(result.Findings))
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1", len(result.Findings))
 	}
 }
 
@@ -984,5 +989,28 @@ func TestPlacementSkillCallers(t *testing.T) {
 	}
 	if bm.BPM != 140 {
 		t.Fatal("source BPM mutated")
+	}
+}
+
+func TestDefaultTaxonomy_StreamDominanceAndAnchorLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		profile pattern.SkillsetProfile
+		stream  bool
+	}{
+		{"short stream in long map", pattern.SkillsetProfile{StreamCount: 1, StreamNoteRatio: .02}, false},
+		{"below boundary", pattern.SkillsetProfile{StreamCount: 1, StreamNoteRatio: .499}, false},
+		{"at boundary", pattern.SkillsetProfile{StreamCount: 1, StreamNoteRatio: .5}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DefaultTaxonomy()[0].Match(tc.profile); got != tc.stream {
+				t.Fatalf("stream = %v, want %v", got, tc.stream)
+			}
+		})
+	}
+	for _, rule := range DefaultTaxonomy() {
+		if rule.Skillset == "tech" && rule.Match(pattern.SkillsetProfile{AvgAnchorCount: 100}) {
+			t.Fatal("anchors alone must not establish tech")
+		}
 	}
 }
