@@ -1,15 +1,12 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/normalize"
-	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/osufile"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/beatmapimport"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/storage"
 )
 
@@ -105,37 +102,15 @@ func (s *Server) ImportBeatmap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw, err := osufile.Parse(bytes.NewReader(source))
+	saved, isNew, err := beatmapimport.Import(r.Context(), s.Beatmaps, s.Enricher, source)
 	if err != nil {
-		writeProblem(w, http.StatusUnprocessableEntity, "Unparseable Beatmap", "file is not a parseable .osu file: "+err.Error())
-		return
-	}
-	beatmap, err := normalize.Beatmap(raw, source)
-	if err != nil {
-		writeProblem(w, http.StatusUnprocessableEntity, "Unparseable Beatmap", "failed to normalize beatmap: "+err.Error())
-		return
-	}
-
-	_, err = s.Beatmaps.FindByHash(r.Context(), beatmap.OsuFileHash)
-	isNew := errors.Is(err, storage.ErrBeatmapNotFound)
-	if err != nil && !isNew {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
-		return
-	}
-
-	saved, err := s.Beatmaps.Save(r.Context(), beatmap)
-	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
-		return
-	}
-
-	// Star rating enrichment is best-effort and must never fail the
-	// import response — the osu! API being down, or the map being
-	// unranked, are both expected, non-fatal outcomes (internal/enrich).
-	if s.Enricher != nil {
-		if err := s.Enricher.Enrich(r.Context(), saved, source); err != nil {
-			log.Printf("star rating enrichment failed for beatmap %q: %v", saved.ID, err)
+		var invalid *beatmapimport.InvalidFileError
+		if errors.As(err, &invalid) {
+			writeProblem(w, http.StatusUnprocessableEntity, "Unparseable Beatmap", invalid.Error())
+		} else {
+			writeProblem(w, http.StatusInternalServerError, "Internal Server Error", err.Error())
 		}
+		return
 	}
 
 	if isNew {
