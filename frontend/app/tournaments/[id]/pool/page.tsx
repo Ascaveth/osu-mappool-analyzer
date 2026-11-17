@@ -4,6 +4,7 @@ import { use, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { importPoolBeatmaps, type PoolImportAssignment } from "@/lib/pool-import";
 import type { Tournament } from "@/lib/types";
 import {
   formatBeatmapLabel,
@@ -41,7 +42,8 @@ export default function PoolPage({
   const [slotInputs, setSlotInputs] = useState<Record<string, string>>({});
   const [slotImporting, setSlotImporting] = useState<Record<string, boolean>>({});
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({});
-  const [applyingAll, setApplyingAll] = useState(false);
+  const [importMode, setImportMode] = useState<"single" | "batch" | null>(null);
+  const importInFlight = useRef(false);
   const [applyingTotal, setApplyingTotal] = useState(0);
   const returnFocusId = useRef<string | null>(null);
   const loadingDialog = useRef<HTMLDialogElement>(null);
@@ -49,15 +51,14 @@ export default function PoolPage({
     {},
   );
 
-  const refresh = useCallback(async () => {
-    try {
-      const t = await api.getTournament(id);
+  const refresh = useCallback(() => api.getTournament(id)
+    .then((t) => {
       setTournament(t);
       setError(null);
-    } catch (e) {
+    })
+    .catch((e: unknown) => {
       setError(e instanceof Error ? e.message : "Failed to load pool");
-    }
-  }, [id]);
+    }), [id]);
 
   useEffect(() => {
     refresh();
@@ -68,9 +69,8 @@ export default function PoolPage({
     [];
   const filledCount = allSlots.filter((sl) => sl.beatmap !== null).length;
   const totalCount = allSlots.length;
-  const singleImportInFlight =
-    !applyingAll && Object.values(slotImporting).some(Boolean);
-  const pageFrozen = applyingAll || singleImportInFlight;
+  const applyingAll = importMode === "batch";
+  const pageFrozen = importMode !== null;
 
   useEffect(() => {
     if (!pageFrozen) {
@@ -97,37 +97,53 @@ export default function PoolPage({
     )
     .map((sl) => sl.id);
 
-  const importAndAssign = async (
-    slotId: string,
-    opts?: { skipRefresh?: boolean; rawInput?: string },
+  const runImports = async (
+    assignments: PoolImportAssignment[],
+    focusId: string,
+    batch = false,
   ) => {
-    if (pageFrozen && !opts?.skipRefresh) return;
-    const url = (opts?.rawInput ?? slotInputs[slotId] ?? "").trim();
-    if (!url) return;
-    if (!opts?.skipRefresh) returnFocusId.current = `slot-action-${slotId}`;
-    setSlotImporting((prev) => ({ ...prev, [slotId]: true }));
-    setSlotErrors((prev) => {
-      const next = { ...prev };
-      delete next[slotId];
-      return next;
-    });
+    if (importInFlight.current || assignments.length === 0) return;
+    importInFlight.current = true;
+    returnFocusId.current = focusId;
+    setImportMode(batch ? "batch" : "single");
+    setApplyingTotal(assignments.length);
     try {
-      const bm = await api.importBeatmapFromUrl(url);
-      await api.assignBeatmap(slotId, bm.id);
-      setSlotInputs((prev) => {
-        const next = { ...prev };
-        delete next[slotId];
-        return next;
+      const updated = await importPoolBeatmaps({
+        client: api,
+        tournamentId: id,
+        assignments,
+        onUpdate: (update) => {
+          const { slotId } = update;
+          setSlotImporting((prev) => ({ ...prev, [slotId]: update.kind === "importing" }));
+          setSlotErrors((prev) => {
+            const next = { ...prev };
+            if (update.kind === "failed") next[slotId] = update.message;
+            else delete next[slotId];
+            return next;
+          });
+          if (update.kind === "assigned") {
+            setSlotInputs((prev) => {
+              const next = { ...prev };
+              delete next[slotId];
+              return next;
+            });
+          }
+        },
       });
-      if (!opts?.skipRefresh) await refresh();
+      setTournament(updated);
+      setError(null);
     } catch (e) {
-      setSlotErrors((prev) => ({
-        ...prev,
-        [slotId]: `${e instanceof Error ? e.message : "Import failed"}. Use a beatmap ID such as 3176982 or a full beatmap URL, check your connection, and import again.`,
-      }));
+      setError(e instanceof Error ? e.message : "Failed to load pool");
     } finally {
-      setSlotImporting((prev) => ({ ...prev, [slotId]: false }));
+      importInFlight.current = false;
+      setImportMode(null);
     }
+  };
+
+  const importAndAssign = (slotId: string) => {
+    const rawInput = (slotInputs[slotId] ?? "").trim();
+    if (!rawInput) return;
+    return runImports([{ slotId, rawInput }], `slot-action-${slotId}`);
   };
 
   const getBulkState = (stageId: string): StageBulkState =>
@@ -150,43 +166,21 @@ export default function PoolPage({
     }));
   };
 
-  const APPLY_ALL_CONCURRENCY = 3;
-
   const applyBulkAssignments = async (
     stageId: string,
     assignments: BulkPasteAssignment[],
   ) => {
-    if (pageFrozen || assignments.length === 0) return;
-    returnFocusId.current = `bulk-${stageId}`;
-    setApplyingAll(true);
-    setApplyingTotal(assignments.length);
+    if (importInFlight.current || assignments.length === 0) return;
     setSlotInputs((prev) => {
       const next = { ...prev };
       for (const a of assignments) next[a.slotId] = a.rawInput;
       return next;
     });
-    const queue = [...assignments];
-    const worker = async () => {
-      let next: BulkPasteAssignment | undefined;
-      while ((next = queue.shift()) !== undefined) {
-        await importAndAssign(next.slotId, {
-          skipRefresh: true,
-          rawInput: next.rawInput,
-        });
-      }
-    };
-    await Promise.allSettled(
-      Array.from(
-        { length: Math.min(APPLY_ALL_CONCURRENCY, queue.length) },
-        worker,
-      ),
-    );
-    await refresh();
+    await runImports(assignments, `bulk-${stageId}`, true);
     setBulkByStage((prev) => ({
       ...prev,
       [stageId]: { text: "", preview: null },
     }));
-    setApplyingAll(false);
   };
 
   const clear = async (slotId: string) => {
@@ -208,24 +202,11 @@ export default function PoolPage({
     }
   };
 
-  const applyAll = async () => {
-    if (pageFrozen || pendingSlotIds.length === 0) return;
-    returnFocusId.current = "import-all";
-    setApplyingAll(true);
-    setApplyingTotal(pendingSlotIds.length);
-    const queue = [...pendingSlotIds];
-    const worker = async () => {
-      let slotId: string | undefined;
-      while ((slotId = queue.shift()) !== undefined) {
-        await importAndAssign(slotId, { skipRefresh: true });
-      }
-    };
-    await Promise.allSettled(
-      Array.from({ length: Math.min(APPLY_ALL_CONCURRENCY, queue.length) }, worker)
-    );
-    await refresh();
-    setApplyingAll(false);
-  };
+  const applyAll = () => runImports(
+    pendingSlotIds.map((slotId) => ({ slotId, rawInput: slotInputs[slotId] })),
+    "import-all",
+    true,
+  );
 
   const runAnalysis = () => {
     setRunning(true);
