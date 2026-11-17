@@ -119,3 +119,21 @@ Run with:
 ```sh
 cd backend && go test ./...
 ```
+
+### Placement mechanical profiles
+
+Skill coverage and redundancy resolve fixed category mods through `modmap`.
+BPM uses the effective playback rate, including existing HT support. Run
+membership uses beat-relative timing: scaling note times and local beat lengths
+by the same rate preserves membership. Spinner density is likewise a duration
+ratio. Spatial distances remain osu!pixels; effective CS is not used because
+these features are not circle-size normalized. HD/FL visibility is not modeled.
+
+FM/TB require tournament regulations, which are not configured here. They,
+unknown categories, and conflicting HR+EZ or DT+HT combinations are skipped,
+with a partial-analysis finding and `analyzed_slots` / `skipped_slots_no_fixed_mod`
+metrics. `filled_slots` still includes every occupied placement. Coverage shares
+use analyzed placements; missing-skill conclusions are suppressed when any
+placement is skipped. Redundancy includes effective BPM as its seventh dimension;
+stage-relative normalization and its threshold remain uncalibrated heuristics.
+Category names already participate in the source hash; no new input is added.

@@ -12,7 +12,7 @@ import (
 )
 
 // redundancySimilarityThreshold marks two beatmaps' normalized skill
-// profiles as near-identical. Distance is a 0-1 RMS across six min-max
+// profiles as near-identical. Distance is a 0-1 RMS across seven min-max
 // normalized dimensions (see skillProfileVector), so 0 means literally
 // identical and 1 means maximally spread within this stage. Named and
 // documented individually, following the same convention as
@@ -59,7 +59,7 @@ func (SkillRedundancyAnalyzer) ScopeType() domain.ScopeType { return domain.Scop
 // are deliberately excluded: MaxJumpDistance is redundant with
 // AvgJumpDistance for this purpose, and ObjectCount describes beatmap
 // length, not mechanical skill.
-type skillProfileVector [6]float64
+type skillProfileVector [7]float64
 
 func vectorFromProfile(p pattern.SkillsetProfile) skillProfileVector {
 	return skillProfileVector{
@@ -69,6 +69,7 @@ func vectorFromProfile(p pattern.SkillsetProfile) skillProfileVector {
 		p.AvgAnchorCount,
 		p.ReverseSliderRatio,
 		p.SpinnerDensity,
+		p.BPM,
 	}
 }
 
@@ -142,6 +143,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		nameOccurrences[c.Name]++
 	}
 
+	skippedSlots := 0
 	var slotCodes []string
 	var vectors []skillProfileVector
 	for _, c := range stage.Categories {
@@ -149,18 +151,23 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 			if slot.Beatmap == nil {
 				continue
 			}
+			profile, ok := pattern.ComputePlacementSkillsetProfile(slot.Beatmap, c.Name)
+			if !ok {
+				skippedSlots++
+				continue
+			}
 			code := fmt.Sprintf("%s%d", c.Name, slot.Position)
 			if nameOccurrences[c.Name] > 1 {
 				code = fmt.Sprintf("%s%d (category #%d)", c.Name, slot.Position, c.Order)
 			}
 			slotCodes = append(slotCodes, code)
-			vectors = append(vectors, vectorFromProfile(pattern.ComputeSkillsetProfile(slot.Beatmap)))
+			vectors = append(vectors, vectorFromProfile(profile))
 		}
 	}
 
-	metrics := map[string]float64{"filled_slots": float64(len(slotCodes))}
+	metrics := map[string]float64{"filled_slots": float64(len(slotCodes) + skippedSlots), "analyzed_slots": float64(len(slotCodes)), "skipped_slots_no_fixed_mod": float64(skippedSlots)}
 	if len(slotCodes) < minSlotsForRedundancyJudgment {
-		return analysis.Result{Metrics: metrics}, nil
+		return analysis.Result{Metrics: metrics, Findings: partialSkillFindings(skippedSlots)}, nil
 	}
 
 	normalized := normalizeVectors(vectors)
@@ -186,7 +193,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	metrics["closest_pair_distance"] = closest
 
 	if len(pairs) == 0 {
-		return analysis.Result{Metrics: metrics}, nil
+		return analysis.Result{Metrics: metrics, Findings: partialSkillFindings(skippedSlots)}, nil
 	}
 
 	sort.Slice(pairs, func(i, j int) bool {
@@ -204,7 +211,7 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 		reportCount = maxRedundancyFindings
 	}
 
-	findings := make([]domain.Finding, 0, reportCount)
+	findings := partialSkillFindings(skippedSlots)
 	for _, p := range pairs[:reportCount] {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
