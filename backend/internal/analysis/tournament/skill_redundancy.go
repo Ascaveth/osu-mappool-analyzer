@@ -11,13 +11,7 @@ import (
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 )
 
-// redundancySimilarityThreshold marks two beatmaps' normalized skill
-// profiles as near-identical. Distance is a 0-1 RMS across seven min-max
-// normalized dimensions (see skillProfileVector), so 0 means literally
-// identical and 1 means maximally spread within this stage. Named and
-// documented individually, following the same convention as
-// jumpDistanceThreshold/techAnchorCountThreshold in skillcoverage.go, since
-// this is a stated calibration choice, not a measured fact.
+// redundancySimilarityThreshold is a provisional heuristic, pending pooler calibration.
 const redundancySimilarityThreshold = 0.15
 
 // maxRedundancyFindings caps how many redundant pairs are reported per
@@ -73,51 +67,23 @@ func vectorFromProfile(p pattern.SkillsetProfile) skillProfileVector {
 	}
 }
 
-// normalizeVectors min-max normalizes each dimension across the given
-// vectors, relative to this stage only — the same principle
-// BalanceAnalyzer already applies to AR/OD/slider-ratio variance, since
-// what counts as a "wide" jump or "dense" stream is relative to the pool
-// being built, not an absolute constant. A dimension with zero range
-// across every vector (e.g. no beatmap in the stage uses sliders) carries
-// no distinguishing information, so it is left at zero for every vector
-// rather than divided by zero.
-func normalizeVectors(vectors []skillProfileVector) []skillProfileVector {
-	if len(vectors) == 0 {
-		return nil
-	}
-	var mins, maxs skillProfileVector
-	mins = vectors[0]
-	maxs = vectors[0]
-	for _, v := range vectors[1:] {
-		for i := range v {
-			if v[i] < mins[i] {
-				mins[i] = v[i]
-			}
-			if v[i] > maxs[i] {
-				maxs[i] = v[i]
-			}
-		}
-	}
+// Fixed feature scales keep pair distances independent of stage composition.
+// shortcut: scales are provisional heuristics; revisit with Task 3 features and Task 5 calibration.
+// Units: osu pixels, runs, notes, anchors, ratio, ratio, BPM.
+var redundancyFeatureScales = skillProfileVector{200, 10, 32, 4, 1, 1, 100}
 
+func normalizeVectors(vectors []skillProfileVector) []skillProfileVector {
 	normalized := make([]skillProfileVector, len(vectors))
 	for i, v := range vectors {
-		var n skillProfileVector
 		for d := range v {
-			rangeD := maxs[d] - mins[d]
-			if rangeD <= 0 {
-				n[d] = 0
-				continue
-			}
-			n[d] = (v[d] - mins[d]) / rangeD
+			normalized[i][d] = v[d] / redundancyFeatureScales[d]
 		}
-		normalized[i] = n
 	}
 	return normalized
 }
 
 // rmsDistance is the root-mean-square distance between two normalized
-// vectors: 0 means identical on every dimension, 1 means maximally
-// different on every dimension.
+// vectors: 0 means identical; distances are not bounded by 1.
 func rmsDistance(a, b skillProfileVector) float64 {
 	sumSq := 0.0
 	for i := range a {
@@ -130,6 +96,7 @@ func rmsDistance(a, b skillProfileVector) float64 {
 type redundantPair struct {
 	slotACode, slotBCode string
 	distance             float64
+	evidence             string
 }
 
 func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (analysis.Result, error) {
@@ -181,8 +148,13 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 				closest = d
 			}
 			if d < redundancySimilarityThreshold {
+				a, b := slotCodes[i], slotCodes[j]
+				if a > b {
+					a, b = b, a
+				}
 				pairs = append(pairs, redundantPair{
-					slotACode: slotCodes[i], slotBCode: slotCodes[j],
+					slotACode: a, slotBCode: b,
+					evidence: fmt.Sprintf("Scaled feature differences (absolute delta / provisional scale): jump distance %.3f, stream count %.3f, longest run %.3f, anchors %.3f, reverse ratio %.3f, spinner density %.3f, effective BPM %.3f; RMS %.4f < %.2f. Scales and threshold are uncalibrated heuristics.", math.Abs(normalized[i][0]-normalized[j][0]), math.Abs(normalized[i][1]-normalized[j][1]), math.Abs(normalized[i][2]-normalized[j][2]), math.Abs(normalized[i][3]-normalized[j][3]), math.Abs(normalized[i][4]-normalized[j][4]), math.Abs(normalized[i][5]-normalized[j][5]), math.Abs(normalized[i][6]-normalized[j][6]), d, redundancySimilarityThreshold),
 					distance: d,
 				})
 			}
@@ -215,9 +187,9 @@ func (SkillRedundancyAnalyzer) Analyze(_ context.Context, in analysis.Input) (an
 	for _, p := range pairs[:reportCount] {
 		findings = append(findings, domain.Finding{
 			Severity:       domain.SeverityWarning,
-			Description:    fmt.Sprintf("%s and %s test a near-identical mechanical skill profile despite different category labels", p.slotACode, p.slotBCode),
-			Reason:         "a map can be individually well-built and correctly calibrated yet still burn a slot the pool didn't need, if it tests the same skill the same way another slot already does",
-			Recommendation: "replace one of these beatmaps with a map that covers a different mechanical skill, or a different way of testing the same skill",
+			Description:    fmt.Sprintf("%s and %s have similar measured mechanical features", p.slotACode, p.slotBCode),
+			Reason:         p.evidence,
+			Recommendation: "review whether these maps serve distinct intended roles; similarity alone does not establish that either map should be replaced",
 		})
 	}
 
