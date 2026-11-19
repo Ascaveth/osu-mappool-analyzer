@@ -1,7 +1,6 @@
 package sheetimport
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -9,22 +8,26 @@ import (
 )
 
 func TestParseStageBlocks(t *testing.T) {
-	source, err := os.Open("testdata/stage-blocks.csv")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer source.Close()
-	rows, err := Parse(source)
-	if err != nil || len(rows) != 11 {
+	const sheet = `,,MAPPOOLS,,
+,,Finals,,
+,,,MOD#,Map ID
+,,,,
+,,Qualifiers,,
+,,,MOD#,Map ID
+,,,NM1,123
+,,,FM,456
+`
+	rows, err := Parse(strings.NewReader(sheet))
+	if err != nil || len(rows) != 2 {
 		t.Fatalf("Parse rows = %d, error = %v", len(rows), err)
 	}
 	for i, row := range rows {
-		if row.Stage != "Qualifiers" || row.Row != 175+i || row.Error != "" {
+		if row.Stage != "Qualifiers" || row.Row != 7+i || row.Error != "" {
 			t.Errorf("unexpected row: %+v", row)
 		}
 	}
-	if rows[0].MapID != 4134924 || rows[10].MapID != 3093177 || rows[10].Slot != "FM" {
-		t.Fatalf("unexpected first or last row: %+v, %+v", rows[0], rows[10])
+	if rows[0].Slot != "NM1" || rows[0].MapID != 123 || rows[1].Slot != "FM" || rows[1].MapID != 456 {
+		t.Errorf("unexpected assignments: %+v", rows)
 	}
 }
 
