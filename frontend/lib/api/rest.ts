@@ -196,6 +196,25 @@ export function createRestClient(baseUrl: string): ApiClient {
       return readTournament(wire, fetchBeatmapsById);
     },
 
+    sheetImport: {
+      async review(tournamentId, url) {
+        const res = await request(baseUrl, `/tournaments/${encodeURIComponent(tournamentId)}/sheet-import/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        return res.json();
+      },
+      async save(tournamentId, assignments) {
+        const res = await request(baseUrl, `/tournaments/${encodeURIComponent(tournamentId)}/sheet-import`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(assignments),
+        });
+        return res.json();
+      },
+    },
+
     async importBeatmapFromUrl(url: string): Promise<Beatmap> {
       const beatmapId = extractBeatmapId(url.trim());
       const osuRes = await fetch(`/api/osu-proxy?id=${beatmapId}`);

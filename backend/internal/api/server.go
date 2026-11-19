@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis"
@@ -20,9 +21,11 @@ type Enricher interface {
 // own beyond these references — all mutable state lives in the
 // repositories.
 type Server struct {
-	Tournaments storage.TournamentRepository
-	Beatmaps    storage.BeatmapRepository
-	Engine      *analysis.Engine
+	Tournaments       storage.TournamentRepository
+	Beatmaps          storage.BeatmapRepository
+	Engine            *analysis.Engine
+	SavePoolImport    savePoolImport
+	sheetImportClient *http.Client
 
 	// Enricher performs best-effort Star Rating enrichment after a
 	// beatmap import. Nil when star rating fetching is disabled (no osu!
