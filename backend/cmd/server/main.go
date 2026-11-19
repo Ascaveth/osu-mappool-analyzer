@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -17,8 +18,10 @@ import (
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/analysis/tournament"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/api"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/config"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/domain"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/enrich"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/osuapi"
+	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/storage"
 	"github.com/Ascaveth/osu-mappool-analyzer/backend/internal/storage/memory"
 )
 
@@ -78,13 +81,19 @@ func main() {
 		log.Print("star rating enrichment disabled: OSU_CLIENT_ID/OSU_CLIENT_SECRET not set")
 	}
 
+	tournaments := memory.NewTournamentRepository()
+	beatmaps := memory.NewBeatmapRepository()
 	server := api.NewServer(
-		memory.NewTournamentRepository(),
-		memory.NewBeatmapRepository(),
+		tournaments,
+		beatmaps,
 		engine,
 		enricher,
 		starRatings,
 	)
+
+	server.SavePoolImport = func(ctx context.Context, tournamentID string, assignments []storage.PoolAssignment) ([]*domain.Beatmap, error) {
+		return tournaments.ImportPool(ctx, beatmaps, tournamentID, assignments)
+	}
 
 	handler := api.Logging(api.CORS(cfg.AllowedOrigins, api.NewRouter(server)))
 

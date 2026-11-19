@@ -4,6 +4,7 @@ import { use, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { SheetImport } from "@/components/SheetImport";
 import { importPoolBeatmaps, type PoolImportAssignment } from "@/lib/pool-import";
 import type { Tournament } from "@/lib/types";
 import {
@@ -267,6 +268,8 @@ export default function PoolPage({
           <p className="alert-text">{error}</p>
         </div>
       )}
+
+      <SheetImport key={id} client={api.sheetImport} tournamentId={id} refresh={refresh} disabled={pageFrozen} />
 
       <div>
         {tournament.stages.map((stage) => {

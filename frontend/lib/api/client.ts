@@ -1,7 +1,10 @@
 import type { Tournament, Beatmap, Slot, Report } from "@/lib/types";
 import type { CreateTournamentInput } from "./types";
 
+import type { SheetImportClient } from "./sheet-import";
+
 export interface ApiClient {
+  sheetImport?: SheetImportClient;
   createTournament(input: CreateTournamentInput): Promise<Tournament>;
   getTournament(id: string): Promise<Tournament>;
   importBeatmapFromUrl(url: string): Promise<Beatmap>;

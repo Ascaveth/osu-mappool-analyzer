@@ -38,8 +38,12 @@ func (r *BeatmapRepository) Save(_ context.Context, b *domain.Beatmap) (*domain.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	return r.saveLocked(b), nil
+}
+
+func (r *BeatmapRepository) saveLocked(b *domain.Beatmap) *domain.Beatmap {
 	if existingID, ok := r.byHash[b.OsuFileHash]; ok {
-		return cloneBeatmap(r.byID[existingID]), nil
+		return cloneBeatmap(r.byID[existingID])
 	}
 
 	stored := cloneBeatmap(b)
@@ -48,7 +52,7 @@ func (r *BeatmapRepository) Save(_ context.Context, b *domain.Beatmap) (*domain.
 	}
 	r.byID[stored.ID] = stored
 	r.byHash[stored.OsuFileHash] = stored.ID
-	return cloneBeatmap(stored), nil
+	return cloneBeatmap(stored)
 }
 
 func (r *BeatmapRepository) FindByID(_ context.Context, id string) (*domain.Beatmap, error) {

@@ -21,13 +21,9 @@ func (e *InvalidFileError) Error() string { return e.Detail }
 
 // Import parses, saves and enriches a beatmap. Enrichment remains best-effort.
 func Import(ctx context.Context, repo storage.BeatmapRepository, enricher Enricher, source []byte) (*domain.Beatmap, bool, error) {
-	raw, err := osufile.Parse(bytes.NewReader(source))
+	beatmap, err := Prepare(source)
 	if err != nil {
-		return nil, false, &InvalidFileError{Detail: "file is not a parseable .osu file: " + err.Error()}
-	}
-	beatmap, err := normalize.Beatmap(raw, source)
-	if err != nil {
-		return nil, false, &InvalidFileError{Detail: "failed to normalize beatmap: " + err.Error()}
+		return nil, false, err
 	}
 
 	_, err = repo.FindByHash(ctx, beatmap.OsuFileHash)
@@ -51,4 +47,18 @@ func Import(ctx context.Context, repo storage.BeatmapRepository, enricher Enrich
 	}
 
 	return saved, isNew, nil
+}
+
+// Prepare validates and normalizes a beatmap without writing to storage.
+func Prepare(source []byte) (*domain.Beatmap, error) {
+	raw, err := osufile.Parse(bytes.NewReader(source))
+	if err != nil {
+		return nil, &InvalidFileError{Detail: "file is not a parseable .osu file: " + err.Error()}
+	}
+	beatmap, err := normalize.Beatmap(raw, source)
+	if err != nil {
+		return nil, &InvalidFileError{Detail: "failed to normalize beatmap: " + err.Error()}
+	}
+
+	return beatmap, nil
 }

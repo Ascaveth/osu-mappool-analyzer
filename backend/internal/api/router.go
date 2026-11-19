@@ -11,6 +11,8 @@ func NewRouter(s *Server) http.Handler {
 
 	mux.HandleFunc("GET /v1/tournaments", s.ListTournaments)
 	mux.HandleFunc("POST /v1/tournaments", s.CreateTournament)
+	mux.HandleFunc("POST /v1/tournaments/{tournamentId}/sheet-import/preview", s.PreviewSheetImport)
+	mux.HandleFunc("POST /v1/tournaments/{tournamentId}/sheet-import", s.SaveSheetImport)
 	mux.HandleFunc("GET /v1/tournaments/{tournamentId}", s.GetTournament)
 	mux.HandleFunc("PATCH /v1/tournaments/{tournamentId}", s.UpdateTournament)
 	mux.HandleFunc("DELETE /v1/tournaments/{tournamentId}", s.DeleteTournament)

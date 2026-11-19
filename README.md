@@ -121,6 +121,14 @@ cd frontend && npm install && npm run dev
 
 Create a tournament in the frontend and define its stages and mod categories. Add beatmaps in the pool editor, then open the report view to analyze the pool and review findings on composition, progression, balance, and diversity.
 
+### Import a pool from Google Sheets
+
+Open the tab in Google Sheets and copy its URL. It must include a `gid` so the app knows which tab to read. Make sure anyone with the link can view the sheet. This feature requires the backend.
+
+Use one table per stage. Put the stage name one cell to the left of `MOD#` on the row immediately above the table header. Include a `Map ID` column containing numeric osu! beatmap IDs. Extra columns are allowed. Use slot labels such as `NM1` or `HD2`. An unnumbered `FM` works when the stage has exactly one FM slot.
+
+Create the target stages and slots first. In the pool editor, open **Import from Google Sheets**, paste the link, and select **Review import**. Fix any flagged rows and review the tab again. Confirm any replacements before saving. If the batch fails, the pool and beatmap library keep their previous contents.
+
 You can also script these operations through the REST API. Its handlers live in `backend/internal/api`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
